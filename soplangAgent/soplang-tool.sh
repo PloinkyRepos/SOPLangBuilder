@@ -6,6 +6,9 @@ payload="$(cat)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export SOPLANG_TOOL_DIR="${SCRIPT_DIR}"
 export SOPLANG_TOOL_PAYLOAD="${payload}"
+export PERSISTENCE_FOLDER="/persistoStorage"
+export LOGS_FOLDER="/persistoLogs"
+export AUDIT_FOLDER="/persistoAudit"
 
 node --input-type=module <<'NODE'
 import fs from 'fs';
@@ -14,6 +17,7 @@ import {pathToFileURL} from 'url';
 
 const toolDir = process.env.SOPLANG_TOOL_DIR;
 const rawInput = process.env.SOPLANG_TOOL_PAYLOAD || '';
+const logPath = path.join(toolDir, '..', 'last-tool.log');
 
 if (!toolDir) {
     console.error('SOPLANG_TOOL_DIR is not set.');
@@ -28,6 +32,21 @@ if (!rawInput.trim()) {
 if (typeof globalThis.$$ === 'undefined') {
     globalThis.$$ = {};
 }
+
+// Reset log file for each invocation
+try {
+    fs.writeFileSync(logPath, '');
+} catch (e) {
+    console.error(`Failed to prepare log file ${logPath}: ${e.message}`);
+}
+
+const appendLog = (msg) => {
+    try {
+        fs.appendFileSync(logPath, `${msg}\n`);
+    } catch (e) {
+        console.error(`Failed to write log file ${logPath}: ${e.message}`);
+    }
+};
 
 if (typeof globalThis.$$.throwError === 'undefined') {
     globalThis.$$.throwError = async function throwError(error, ...args) {
@@ -66,7 +85,27 @@ const registerPlugin = async (pluginName, pluginModule) => {
         throw new Error(`Module for ${pluginName} does not export a function called getAllow`);
     }
 
-    const plugin = await pluginModule.getInstance();
+    const captured = [];
+    const originalConsole = {
+        log: console.log,
+        info: console.info,
+        warn: console.warn,
+        error: console.error,
+        debug: console.debug,
+    };
+    const capture = (...args) => captured.push(args.map(arg => String(arg)).join(' '));
+    let plugin;
+    try {
+        console.log = console.info = console.warn = console.error = console.debug = capture;
+        plugin = await pluginModule.getInstance();
+    } finally {
+        console.log = originalConsole.log;
+        console.info = originalConsole.info;
+        console.warn = originalConsole.warn;
+        console.error = originalConsole.error;
+        console.debug = originalConsole.debug;
+        appendLog(captured.join('\n'));
+    }
     plugin.allow = await pluginModule.getAllow();
     if (!plugin) {
         throw new Error(`Module for plugin ${pluginName} did not return a plugin instance`);
@@ -216,7 +255,7 @@ for (const {name, file} of manualPlugins) {
     }
     try {
         await $$.registerPlugin(name, pluginFile);
-        console.error(`Registered plugin: ${name}`);
+        appendLog(`Registered plugin: ${name}`);
     } catch (error) {
         console.error(`Error registering plugin ${name}: ${error.message}`);
     }
@@ -244,6 +283,9 @@ if (typeof targetPlugin[methodName] !== 'function') {
 try {
     const result = await targetPlugin[methodName].call(targetPlugin, ...params);
     process.stdout.write(JSON.stringify(result));
+    let workspace = plugins["Workspace"];
+    await workspace.shutDown();
+    process.exit(0);
 } catch (err) {
     console.error(`Error executing ${pluginName}.${methodName}: ${err.message}`);
     process.exit(1);
