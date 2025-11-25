@@ -1,5 +1,6 @@
 {
     "name": "SOPLangBuilder",
+    "type": "module",
     "dependencies": {
         "soplang": "github:AssistOS-AI/soplang"
     }
