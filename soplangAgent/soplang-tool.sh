@@ -168,7 +168,8 @@ await import(pathToFileURL(path.join(toolDir, 'src', 'util', 'debugUtil.js'))).c
 
 let payload;
 try {
-    payload = JSON.parse(rawInput);
+    let parsed = JSON.parse(rawInput);
+    payload = parsed.input;
 } catch (err) {
     console.error(`Invalid JSON input: ${err.message}`);
     process.exit(1);
@@ -189,48 +190,32 @@ if (!Array.isArray(params)) {
     process.exit(1);
 }
 
-const pluginsDir = path.join(toolDir, 'plugins');
+const pluginsDir = path.join(toolDir,'node_modules','soplang','plugins');
 
 if (!fs.existsSync(pluginsDir)) {
     console.error(`Plugins directory not found at ${pluginsDir}`);
     process.exit(1);
 }
 
-const pluginFiles = fs.readdirSync(pluginsDir)
-    .filter(file => file.endsWith('.js'))
-    .map(file => path.join(pluginsDir, file));
+const manualPlugins = [
+    {name: 'DefaultPersistence', file: 'StandardPersistence.js'},
+    {name: 'Workspace', file: 'Workspace.js'},
+    {name: 'Agent', file: 'Agent.js'},
+    {name: 'WorkspaceUser', file: 'WorkspaceUser.js'},
+    {name: 'Documents', file: 'Documents.js'},
+    {name: 'Table', file: 'Table.js'},
+    {name: 'LLM', file: 'LLM.js'},
+    {name: 'ChatRoom', file: 'ChatRoom.js'},
+];
 
-if (pluginFiles.length === 0) {
-    console.error(`No plugin files found in ${pluginsDir}`);
-    process.exit(1);
-}
-
-const pluginModules = {};
-
-for (const pluginFile of pluginFiles) {
-    try {
-        const pluginModule = await loadPluginModule(pluginFile);
-        const name = path.basename(pluginFile, '.js');
-        pluginModules[name] = pluginModule;
-    } catch (error) {
-        console.error(`Error loading plugin from ${pluginFile}: ${error.message}`);
-    }
-}
-
-const graph = await buildDependencyGraph(pluginModules);
-const sortedPlugins = topologicalSort(graph);
-
-for (const name of sortedPlugins) {
-    const pluginModule = pluginModules[name];
-    const pluginFile = path.join(pluginsDir, `${name}.js`);
-
+for (const {name, file} of manualPlugins) {
+    const pluginFile = path.join(pluginsDir, file);
     if (!fs.existsSync(pluginFile)) {
-        console.warn(`Plugin file not found for ${name}`);
+        console.warn(`Plugin file not found for ${name} at ${pluginFile}`);
         continue;
     }
-
     try {
-        await registerPlugin(name, pluginModule);
+        await $$.registerPlugin(name, pluginFile);
         console.error(`Registered plugin: ${name}`);
     } catch (error) {
         console.error(`Error registering plugin ${name}: ${error.message}`);
@@ -258,7 +243,7 @@ if (typeof targetPlugin[methodName] !== 'function') {
 
 try {
     const result = await targetPlugin[methodName].call(targetPlugin, ...params);
-    console.log(JSON.stringify(result ?? null));
+    process.stdout.write(JSON.stringify(result));
 } catch (err) {
     console.error(`Error executing ${pluginName}.${methodName}: ${err.message}`);
     process.exit(1);
