@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
 
 # Read JSON payload from stdin (expects pluginName, methodName, params)
 payload="$(cat)"
