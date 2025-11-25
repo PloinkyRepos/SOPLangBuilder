@@ -1,0 +1,27 @@
+{
+    "tools": [
+        {
+            "name": "soplang-tool",
+            "title": "Soplang tool",
+            "description": "Executes soplang methods from soplang plugins",
+            "command": "/code/soplang-tool.sh",
+            "inputSchema": {
+                "pluginName": {
+                    "type": "string",
+                    "description": "Plugin name",
+                    "optional": false
+                },
+                "methodName": {
+                    "type": "string",
+                    "description": "Method name",
+                    "optional": false
+                },
+                "params": {
+                    "type": "array",
+                    "description": "Method parameters",
+                    "optional": true
+                }
+            }
+        }
+    ]
+}
