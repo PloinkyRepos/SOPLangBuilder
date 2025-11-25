@@ -1,0 +1,4 @@
+{
+    "container": "node:18-alpine",
+    "preinstall": "npm install"
+}
