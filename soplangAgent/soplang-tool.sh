@@ -123,76 +123,6 @@ const registerPlugin = async (pluginName, pluginModule) => {
     }
 };
 
-const buildDependencyGraph = async (pluginModules) => {
-    const graph = {};
-
-    Object.keys(pluginModules).forEach(pluginName => {
-        graph[pluginName] = [];
-    });
-
-    const results = await Promise.all(Object.keys(pluginModules).map(async (pluginName) => {
-        const pluginModule = pluginModules[pluginName];
-        let dependencies = [];
-        if (typeof pluginModule.getDependencies === 'function') {
-            dependencies = await pluginModule.getDependencies();
-        }
-        return {pluginName, dependencies: dependencies || []};
-    }));
-
-    results.forEach(result => {
-        result.dependencies.forEach(dep => {
-            if (!graph[result.pluginName]) {
-                graph[result.pluginName] = [];
-            }
-            graph[result.pluginName].push(dep);
-        });
-    });
-
-    return graph;
-};
-
-const topologicalSort = (graph) => {
-    const visited = {};
-    const temp = {};
-    const order = [];
-
-    Object.keys(graph).forEach(node => {
-        visited[node] = false;
-        temp[node] = false;
-    });
-
-    const visit = (node) => {
-        if (temp[node]) {
-            throw new Error(`Circular dependency detected involving plugin ${node}`);
-        }
-
-        if (visited[node]) {
-            return;
-        }
-
-        temp[node] = true;
-
-        if (graph[node] && Array.isArray(graph[node])) {
-            graph[node].forEach(dependency => {
-                visit(dependency);
-            });
-        }
-
-        temp[node] = false;
-        visited[node] = true;
-
-        order.push(node);
-    };
-
-    Object.keys(graph).forEach(node => {
-        if (!visited[node]) {
-            visit(node);
-        }
-    });
-
-    return order;
-};
-
 $$.registerPlugin = async (pluginName, pluginPath) => {
     const resolvedPath = path.isAbsolute(pluginPath) ? pluginPath : path.resolve(toolDir, pluginPath);
     const pluginModule = await loadPluginModule(resolvedPath);
@@ -260,6 +190,32 @@ for (const {name, file} of manualPlugins) {
         console.error(`Error registering plugin ${name}: ${error.message}`);
     }
 }
+
+const achillesPluginPath = path.join(toolDir, 'plugins', 'AchillesSkills.js');
+if (fs.existsSync(achillesPluginPath)) {
+    try {
+        await $$.registerPlugin("AchillesSkills", achillesPluginPath);
+        appendLog("Registered plugin: AchillesSkills");
+    } catch (error) {
+        console.error(`Error registering plugin AchillesSkills: ${error.message}`);
+    }
+} else {
+    console.warn(`AchillesSkills plugin not found at ${achillesPluginPath}`);
+}
+
+const soplangBuilderPath = path.join(toolDir, 'plugins', 'SoplangBuilder.js');
+if (fs.existsSync(soplangBuilderPath)) {
+    try {
+        await $$.registerPlugin("SoplangBuilder", soplangBuilderPath);
+        appendLog("Registered plugin: SoplangBuilder");
+    } catch (error) {
+        console.error(`Error registering plugin SoplangBuilder: ${error.message}`);
+    }
+} else {
+    console.warn(`SoplangBuilder plugin not found at ${soplangBuilderPath}`);
+}
+
+
 
 const targetPlugin = plugins[pluginName];
 if (!targetPlugin) {

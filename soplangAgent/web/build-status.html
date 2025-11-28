@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>soplangAgent build console</title>
+  <link rel="stylesheet" href="build-status.css">
+</head>
+<body>
+  <header>
+    <h1>soplangAgent — Build & Variables</h1>
+    <div class="sub">Monitor build status, trigger builds, and inspect variables in one place.</div>
+  </header>
+
+  <div class="page-header">
+    <div class="build-page-title">Build</div>
+    <div>
+      <button id="refresh-status">Refresh</button>
+      <button id="start-build" class="primary">Rebuild</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="errors">Build Errors</div>
+    <div class="tab" data-tab="vars">Variables</div>
+  </div>
+
+  <div class="page-body">
+    <section class="panel tab-content" data-content="errors">
+      <div class="errors-list" id="errors-body">No errors</div>
+    </section>
+
+    <section class="panel tab-content hidden" data-content="vars">
+      <table class="vars-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Variable</th>
+            <th>Document</th>
+            <th>Value</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="vars-body">
+          <tr><td colspan="5" class="table-message">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="var-modal">
+    <div class="modal">
+      <span class="close" data-action="close-modal">&#x2715;</span>
+      <h3>Variable details</h3>
+      <pre id="var-modal-body">—</pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createAgentClient } from '/MCPBrowserClient.js';
+    window.createAgentClient = createAgentClient;
+  </script>
+  <script type="module" src="build-status.js"></script>
+
+  <div class="modal-backdrop" id="var-modal">
+    <div class="modal">
+      <span class="close" data-action="close-modal">&#x2715;</span>
+      <h3>Variable details</h3>
+      <div id="var-modal-body">—</div>
+    </div>
+  </div>
+</body>
+</html>

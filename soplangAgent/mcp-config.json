@@ -5,6 +5,7 @@
             "title": "Soplang tool",
             "description": "Executes soplang methods from soplang plugins",
             "command": "/code/soplang-tool.sh",
+            "cwd":"workspace",
             "inputSchema": {
                 "pluginName": {
                     "type": "string",
