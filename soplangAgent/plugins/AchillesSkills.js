@@ -68,7 +68,7 @@ async function AchillesSkills() {
                 if (registered.has(cmd)) continue;
                 workspace.registerCommand(cmd, async (inputValues) => {
                     await ensureAgent();
-                    const parsed = parseArgs(inputValues);
+                const parsed = parseArgs(inputValues);
                 if (record.type === "code") {
                     const baseArgs = (parsed && typeof parsed === "object" && !Array.isArray(parsed))
                         ? { ...parsed }
@@ -100,6 +100,28 @@ async function AchillesSkills() {
         agent = null;
         registered.clear();
         return registerSkills();
+    };
+
+    self.executeSkill = async function (skillName, args = {}) {
+        if (!skillName || typeof skillName !== "string") {
+            throw new Error("skillName is required");
+        }
+        if (typeof args === "string") {
+            try {
+                args = JSON.parse(args);
+            } catch (_) {
+                // leave as string if not JSON
+            }
+        }
+        await registerSkills();
+        await ensureAgent();
+        const payload = { skillName, args };
+        const result = await agent.executeWithReviewMode("", payload, "none");
+        // normalize result: if wrapped {result}, unwrap
+        if (result && typeof result === "object" && Object.prototype.hasOwnProperty.call(result, "result")) {
+            return result.result;
+        }
+        return result;
     };
 
     return self;

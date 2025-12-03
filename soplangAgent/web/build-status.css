@@ -113,6 +113,8 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   width: min(520px, 90vw);
   color: #111827;
   box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+  max-height: 90%;
+  overflow: auto;
 }
 .modal h3 { margin-top: 0; }
 .modal .close {
