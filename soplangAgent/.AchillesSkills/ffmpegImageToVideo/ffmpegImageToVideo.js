@@ -172,7 +172,7 @@ const normalizeMediaList = (raw) => {
       continue;
     }
     if (entry && typeof entry === "object") {
-      const candidate = entry.path || entry.downloadUrl || entry.localPath || entry.url || entry.value;
+      const candidate = entry.id || entry.path || entry.downloadUrl || entry.localPath || entry.url || entry.value;
       if (candidate) {
         flat.push(String(candidate));
       }
@@ -191,6 +191,10 @@ const downloadToFile = async (url, targetPath) => {
     if (!res.ok) {
       throw new Error(`Failed to download ${u}: ${res.status} ${res.statusText}`);
     }
+    const contentType = (res.headers?.get("content-type") || "").toLowerCase();
+    if (contentType.includes("image/svg")) {
+      throw new Error("SVG images are not supported; please convert to PNG/JPG.");
+    }
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     await fsp.writeFile(targetPath, buffer);
@@ -203,9 +207,20 @@ const downloadToFile = async (url, targetPath) => {
   return targetPath;
 };
 
+const buildBlobUrlFromId = (id) => {
+  const host = process.env.HOST_LOOPBACK || "host.docker.internal";
+  const port = process.env.BLOB_PORT || process.env.PLOINKY_ROUTER_PORT || process.env.PORT || "8080";
+  const agent = process.env.BLOB_AGENT || "explorer";
+  return `http://${host}:${port}/blobs/${encodeURIComponent(agent)}/${encodeURIComponent(String(id).trim())}`;
+};
+
 const ensureLocalPath = async (src, workDir, tempDir, label) => {
   if (!src || typeof src !== "string") {
     throw new Error(`Missing ${label} path/URL`);
+  }
+  const isSvg = src.toLowerCase().endsWith(".svg");
+  if (isSvg) {
+    throw new Error("SVG images are not supported; please convert to PNG/JPG before using ffmpegImageToVideo.");
   }
   if (isHttp(src)) {
     const normalized = normalizeUrlForContainer(src);
@@ -214,14 +229,11 @@ const ensureLocalPath = async (src, workDir, tempDir, label) => {
     await downloadToFile(normalized, dest);
     return dest;
   }
-  const resolved = path.isAbsolute(src) ? src : path.resolve(workDir, src);
-  try {
-    const st = await fsp.stat(resolved);
-    if (!st.isFile()) throw new Error();
-    return resolved;
-  } catch {
-    throw new Error(`File not found for ${label}: ${resolved}`);
-  }
+  const fname = `${label}-${Date.now()}.bin`;
+  const dest = path.join(tempDir, fname);
+  const blobUrl = buildBlobUrlFromId(src);
+  await downloadToFile(blobUrl, dest);
+  return dest;
 };
 
 const pickFfmpegBin = () => {
