@@ -1,4 +1,5 @@
 {
     "container": "node:20-alpine",
-    "postinstall": "npm install && apk add --no-cache ffmpeg"
+    "preinstall": "npm install",
+    "postinstall": "apk add --no-cache ffmpeg"
 }
