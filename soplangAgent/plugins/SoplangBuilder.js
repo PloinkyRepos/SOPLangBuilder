@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { debug } from "./debugLogger.mjs";
 
 const EXCLUDE_DIRS = new Set(["node_modules", ".git", ".ploinky", "dist"]);
 
@@ -89,6 +90,109 @@ const ensureParagraph = (chapter, meta = {}) => {
     });
 };
 
+const registerAchillesCLISOPlangCommands = (workspace) => {
+    debug.log("[SoplangBuilder] Registering custom Achilles CLI SOPLang commands...");
+
+    // Command: load - Load content from a specification file
+    // Syntax: @VAR load path/to/file.md#SECTION-ID
+    workspace.registerCommand("load", async (inputValues, parsedCommand, currentDocId) => {
+        const specRef = inputValues[0];
+        if (!specRef || typeof specRef !== "string") {
+            return undefined;
+        }
+
+        const [filePath, sectionId] = specRef.split("#");
+        if (!filePath) {
+            return undefined;
+        }
+
+        try {
+            const root = await pickRoot();
+            const fullPath = path.isAbsolute(filePath) ? filePath : path.join(root, ".specs", filePath);
+            const content = await fs.readFile(fullPath, "utf8");
+
+            if (sectionId) {
+                // Extract section by ID (look for ## SECTION-ID header)
+                const sectionRegex = new RegExp(`^##\\s+${sectionId}[\\s\\S]*?(?=^##\\s|$)`, "m");
+                const match = content.match(sectionRegex);
+                if (match) {
+                    return match[0].trim();
+                }
+                // Try to find the section as an anchor in the content
+                const anchorRegex = new RegExp(`#${sectionId}[\\s\\S]*?(?=^#|$)`, "gm");
+                const anchorMatch = content.match(anchorRegex);
+                if (anchorMatch) {
+                    return anchorMatch[0].trim();
+                }
+            }
+
+            return content.trim();
+        } catch (err) {
+            console.warn(`load command failed for ${specRef}: ${err.message}`);
+            return undefined;
+        }
+    });
+    debug.log("[SoplangBuilder] ✓ Registered command: load");
+
+    // Command: createJSCode - Generate JavaScript code from a prompt using LLM
+    // Syntax: @compiledFile createJSCode $prompt
+    workspace.registerCommand("createJSCode", async (inputValues, parsedCommand, currentDocId) => {
+        const prompt = inputValues.join(" ");
+        if (!prompt || !prompt.trim()) {
+            return undefined;
+        }
+
+        try {
+            const llm = $$.loadPlugin("LLM");
+            if (!llm || typeof llm.executePrompt !== "function") {
+                console.warn("createJSCode: LLM plugin not available");
+                return `// LLM not available - prompt was:\n// ${prompt.replace(/\n/g, "\n// ")}`;
+            }
+
+            const systemPrompt = `You are a code generator. Generate clean, modern JavaScript (ES modules, async/await) based on the specification provided. Output ONLY the code, no explanations or markdown fences.`;
+            const result = await llm.executePrompt(prompt, {
+                systemPrompt,
+                responseShape: "text",
+            });
+
+            return typeof result === "string" ? result : JSON.stringify(result);
+        } catch (err) {
+            console.warn(`createJSCode command failed: ${err.message}`);
+            return `// Code generation failed: ${err.message}\n// Prompt was:\n// ${prompt.replace(/\n/g, "\n// ")}`;
+        }
+    });
+    debug.log("[SoplangBuilder] ✓ Registered command: createJSCode");
+
+    // Command: store - Save content to a file
+    // Syntax: @result store "path/to/output.js" $content
+    workspace.registerCommand("store", async (inputValues, parsedCommand, currentDocId) => {
+        const filePath = inputValues[0];
+        const content = inputValues.slice(1).join(" ");
+
+        if (!filePath || typeof filePath !== "string") {
+            console.warn("store command: missing file path");
+            return undefined;
+        }
+
+        try {
+            const root = await pickRoot();
+            const fullPath = path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+
+            // Ensure directory exists
+            const dir = path.dirname(fullPath);
+            await fs.mkdir(dir, { recursive: true });
+
+            await fs.writeFile(fullPath, content || "", "utf8");
+            return fullPath;
+        } catch (err) {
+            console.warn(`store command failed for ${filePath}: ${err.message}`);
+            return undefined;
+        }
+    });
+    debug.log("[SoplangBuilder] ✓ Registered command: store");
+    debug.log("[SoplangBuilder] All custom SOPLang commands registered successfully");
+};
+
 const parseDocsFromMarkdown = (markdown, filePath) => {
     const docs = {};
     let currentDocId = path.basename(filePath, ".md");
@@ -148,9 +252,18 @@ const parseDocsFromMarkdown = (markdown, filePath) => {
 };
 
 async function SoplangBuilder() {
+    debug.log("[SoplangBuilder] ========== INITIALIZING ==========");
+    debug.log("[SoplangBuilder] ACHILLES_DEBUG:", process.env.ACHILLES_DEBUG || "(not set)");
+
     const self = {};
     const workspace = $$.loadPlugin("Workspace");
     const documents = $$.loadPlugin("Documents");
+
+    debug.log("[SoplangBuilder] Loaded plugins: Workspace, Documents");
+
+    // Register Achilles CLI SOPLang commands (load, createJSCode, store)
+    registerAchillesCLISOPlangCommands(workspace);
+
     const getVarsWithValues = async () => {
         const vars = await workspace.getEveryVariableObject();
         const enriched = [];
@@ -264,6 +377,134 @@ async function SoplangBuilder() {
 
     self.getVariablesWithValues = async function () {
         return await getVarsWithValues();
+    };
+
+    self.buildFromSpecsMarkdown = async function (root = null) {
+        const startedAt = Date.now();
+        const searchRoot = root || await pickRoot();
+
+        debug.log("[buildFromSpecsMarkdown] ========== BUILD START ==========");
+        debug.log("[buildFromSpecsMarkdown] Search root directory:", searchRoot);
+        debug.log("[buildFromSpecsMarkdown] SOPLANG_WORKSPACE_ROOT env:", process.env.SOPLANG_WORKSPACE_ROOT || "(not set)");
+        debug.log("[buildFromSpecsMarkdown] Current working directory:", process.cwd());
+
+        const files = await walkMarkdown(searchRoot);
+
+        debug.log("[buildFromSpecsMarkdown] Markdown files found:", files.length);
+        if (debug.isEnabled()) {
+            files.forEach((f, i) => debug.log(`  [${i + 1}] ${f}`));
+        }
+
+        if (!files.length) {
+            debug.error("[buildFromSpecsMarkdown] No markdown files found!");
+            throw new Error(`No markdown files found under ${searchRoot}`);
+        }
+
+        const soplangCodeBlocks = [];
+        const matrixSoplangCode = [];
+
+        for (const filePath of files) {
+            let content = "";
+            try {
+                content = await fs.readFile(filePath, "utf8");
+            } catch (err) {
+                console.warn("Failed to read file", filePath, err.message);
+                continue;
+            }
+
+            const parsedDocs = parseDocsFromMarkdown(content, filePath);
+            const fileName = path.basename(filePath);
+
+            // Extract commands from all documents parsed from this file
+            Object.values(parsedDocs).forEach(doc => {
+                if (doc.commands && doc.commands.trim()) {
+                    if (fileName === "matrix.md") {
+                        matrixSoplangCode.push(doc.commands.trim());
+                    } else {
+                        soplangCodeBlocks.push(doc.commands.trim());
+                    }
+                }
+            });
+        }
+
+        // Ensure matrix.md soplang code appears first
+        const allSoplangCode = [...matrixSoplangCode, ...soplangCodeBlocks].join('\n\n');
+
+        debug.log("[buildFromSpecsMarkdown] SOPLang code blocks from matrix.md:", matrixSoplangCode.length);
+        debug.log("[buildFromSpecsMarkdown] SOPLang code blocks from other files:", soplangCodeBlocks.length);
+        debug.log("[buildFromSpecsMarkdown] Total SOPLang code length:", allSoplangCode.length, "characters");
+
+        if (debug.isEnabled() && allSoplangCode.trim()) {
+            debug.log("[buildFromSpecsMarkdown] ---------- CONCATENATED SOPLANG CODE ----------");
+            // Show first 2000 chars or full code if shorter
+            const preview = allSoplangCode.length > 2000
+                ? allSoplangCode.substring(0, 2000) + "\n... (truncated)"
+                : allSoplangCode;
+            debug.log(preview);
+            debug.log("[buildFromSpecsMarkdown] ---------- END SOPLANG CODE ----------");
+        }
+
+        if (!allSoplangCode.trim()) {
+            debug.error("[buildFromSpecsMarkdown] No SOPLang code found in any markdown files!");
+            throw new Error("No soplang code found in .specs markdown files");
+        }
+
+        // Create or update document with concatenated soplang code
+        const docId = "specs-soplang-document";
+        let docObj;
+        try {
+            docObj = await documents.getDocument(docId);
+        } catch (_) {
+            docObj = null;
+        }
+
+        const docTemplate = {
+            docId,
+            title: "Specs SOPLang Document",
+            category: "specs",
+            infoText: "Automatically generated document containing all SOPLang code from .specs markdown files",
+            commands: allSoplangCode
+        };
+
+        if (!docObj) {
+            await documents.createDocument(docId, "specs");
+        }
+
+        await documents.updateDocument(docId, docTemplate.title, docId, docTemplate.category, docTemplate.infoText, docTemplate.commands, {});
+        debug.log("[buildFromSpecsMarkdown] Document updated:", docId);
+
+        debug.log("[buildFromSpecsMarkdown] Saving workspace...");
+        await workspace.forceSave();
+        debug.log("[buildFromSpecsMarkdown] Workspace saved");
+
+        debug.log("[buildFromSpecsMarkdown] Building all SOPLang code...");
+        const buildResult = await workspace.buildAll();
+        debug.log("[buildFromSpecsMarkdown] Build completed. Result:", buildResult);
+
+        const durationMs = Date.now() - startedAt;
+        const buildErrors = $$.getBuildErrors?.() || [];
+
+        if (buildErrors.length > 0) {
+            debug.error("[buildFromSpecsMarkdown] Build errors detected:", buildErrors.length);
+            buildErrors.forEach((err, i) => debug.error(`  Error ${i + 1}:`, err));
+        } else {
+            debug.log("[buildFromSpecsMarkdown] ✓ No build errors");
+        }
+
+        debug.log("[buildFromSpecsMarkdown] ========== BUILD COMPLETE ==========");
+        debug.log("[buildFromSpecsMarkdown] Duration:", durationMs, "ms");
+        debug.log("[buildFromSpecsMarkdown] Files scanned:", files.length);
+        debug.log("[buildFromSpecsMarkdown] SOPLang code length:", allSoplangCode.length);
+
+        return {
+            docId,
+            soplangCodeLength: allSoplangCode.length,
+            filesScanned: files.length,
+            matrixCodeBlocks: matrixSoplangCode.length,
+            otherCodeBlocks: soplangCodeBlocks.length,
+            errors: buildErrors,
+            durationMs
+        };
     };
 
     return self;
