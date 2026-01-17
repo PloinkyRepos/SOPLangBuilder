@@ -1,5 +1,9 @@
 {
-    "container": "node:20-alpine",
-    "preinstall": "npm install",
-    "postinstall": "apk add --no-cache ffmpeg"
+    "container": "node:20-bullseye",
+    "profiles": {
+        "default": {
+            "preinstall": "npm install",
+            "postinstall": "apt-get update && apt-get install -y ffmpeg"
+        }
+    }
 }
