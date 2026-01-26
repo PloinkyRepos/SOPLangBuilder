@@ -2,8 +2,7 @@
     "container": "node:20-bullseye",
     "profiles": {
         "default": {
-            "preinstall": "apt-get update && apt-get install -y git ffmpeg",
-            "install": "npm install"
+            "install": "apt-get update && apt-get install -y git ffmpeg && npm install"
         }
     }
 }
