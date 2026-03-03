@@ -5,16 +5,14 @@ echo "Installing soplangAgent dependencies..."
 
 if [ "${PLOINKY_RUNTIME:-}" = "bwrap" ]; then
     echo "Running under bwrap — skipping apt-get (using host packages)"
-    missing=""
-    for cmd in git ffmpeg; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            missing="$missing $cmd"
-        fi
-    done
-    if [ -n "$missing" ]; then
-        echo "ERROR: missing host packages:$missing"
-        echo "  sudo apt install -y$missing"
+    # git is required; ffmpeg is optional (only needed for multimedia processing)
+    if ! command -v git >/dev/null 2>&1; then
+        echo "ERROR: git not found on host"
         exit 1
+    fi
+    if ! command -v ffmpeg >/dev/null 2>&1; then
+        echo "WARNING: ffmpeg not found on host (needed for multimedia features)"
+        echo "  sudo apt install -y ffmpeg"
     fi
 else
     apt-get update && apt-get install -y git ffmpeg
