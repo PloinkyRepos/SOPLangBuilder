@@ -1,8 +1,9 @@
 {
+    "sandbox": true,
     "container": "node:20-bullseye",
     "profiles": {
         "default": {
-            "install": "apt-get update && apt-get install -y git ffmpeg"
+            "install": "/code/scripts/install.sh"
         }
     }
 }
