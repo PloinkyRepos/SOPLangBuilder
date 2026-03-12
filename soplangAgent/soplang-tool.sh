@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Read JSON payload from stdin (expects pluginName, methodName, params)
+# Read JSON payload from stdin.
 payload="$(cat)"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -18,14 +18,20 @@ import {pathToFileURL} from 'url';
 const toolDir = process.env.SOPLANG_TOOL_DIR;
 const rawInput = process.env.SOPLANG_TOOL_PAYLOAD || '';
 const logPath = path.join(toolDir, '..', 'last-tool.log');
+const toolName = process.env.TOOL_NAME;
 
 if (!toolDir) {
     console.error('SOPLANG_TOOL_DIR is not set.');
     process.exit(1);
 }
 
+if (!toolName) {
+    console.error('TOOL_NAME is not set.');
+    process.exit(1);
+}
+
 if (!rawInput.trim()) {
-    console.error('No input received. Provide JSON via stdin with pluginName, methodName and params.');
+    console.error('No input received. Provide JSON via stdin.');
     process.exit(1);
 }
 
@@ -134,17 +140,26 @@ $$.loadPlugin = (pluginName) => {
 };
 
 await import(pathToFileURL(path.join(toolDir, 'src', 'util', 'debugUtil.js'))).catch(() => {});
+const { deriveInvocation } = await import(pathToFileURL(path.join(toolDir, 'plugins', 'lib', 'toolInvocation.mjs')));
 
 let payload;
 try {
     let parsed = JSON.parse(rawInput);
-    payload = parsed.input;
+    payload = parsed.input || {};
 } catch (err) {
     console.error(`Invalid JSON input: ${err.message}`);
     process.exit(1);
 }
 
-const {pluginName, methodName, params = []} = payload;
+let invocation;
+try {
+    invocation = deriveInvocation(toolName, payload);
+} catch (error) {
+    console.error(error.message);
+    process.exit(1);
+}
+
+const {pluginName, methodName, params = []} = invocation;
 
 if (!pluginName || typeof pluginName !== 'string') {
     console.error('"pluginName" must be a non-empty string.');

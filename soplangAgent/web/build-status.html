@@ -15,8 +15,16 @@
   <div class="page-header">
     <div class="build-page-title">Build</div>
     <div>
-      <button id="refresh-status">Refresh</button>
-      <button id="start-build" class="primary">Rebuild</button>
+      <button id="execute-build">Build</button>
+      <button id="start-build" class="primary">Sync Variables</button>
+    </div>
+  </div>
+
+  <div class="build-status-strip hidden" id="build-status-strip" aria-live="polite">
+    <div class="build-spinner" id="build-spinner" aria-hidden="true"></div>
+    <div class="build-status-copy">
+      <div class="build-status-title" id="build-status-title">Idle</div>
+      <div class="build-status-detail" id="build-status-detail">No build running.</div>
     </div>
   </div>
 
@@ -62,12 +70,5 @@
   </script>
   <script type="module" src="build-status.js"></script>
 
-  <div class="modal-backdrop" id="var-modal">
-    <div class="modal">
-      <span class="close" data-action="close-modal">&#x2715;</span>
-      <h3>Variable details</h3>
-      <div id="var-modal-body">—</div>
-    </div>
-  </div>
 </body>
 </html>

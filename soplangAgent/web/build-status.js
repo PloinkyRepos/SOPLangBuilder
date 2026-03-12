@@ -6,6 +6,11 @@ const client = createAgentClient(SOPLANG_MCP);
 let warnings = [];
 let errors = [];
 let variables = [];
+let buildState = {
+  active: false,
+  title: 'Idle',
+  detail: 'No build running.'
+};
 
 const extractMcpText = (result) => {
   if (!result || !Array.isArray(result.content)) return '';
@@ -19,8 +24,8 @@ const extractMcpText = (result) => {
     .join('\n');
 };
 
-async function callTool(name, args = {}) {
-  const result = await client.callTool(name, args);
+async function callTool(name, args = {}, options = {}) {
+  const result = await client.callTool(name, args, options);
   const text = extractMcpText(result);
   if (text) {
     try {
@@ -32,8 +37,70 @@ async function callTool(name, args = {}) {
   return result;
 }
 
+function renderBuildState() {
+  const strip = document.getElementById('build-status-strip');
+  const title = document.getElementById('build-status-title');
+  const detail = document.getElementById('build-status-detail');
+  strip.classList.toggle('hidden', !buildState.active);
+  title.textContent = buildState.title;
+  detail.textContent = buildState.detail;
+}
+
+function setBuildState(active, title, detail) {
+  buildState = {
+    active,
+    title: title || 'Idle',
+    detail: detail || 'No build running.'
+  };
+  renderBuildState();
+}
+
+function describeTaskUpdate(task, fallbackLabel) {
+  const status = typeof task?.status === 'string' ? task.status.toLowerCase() : 'queued';
+  if (status === 'queued') {
+    return {
+      title: `${fallbackLabel} queued`,
+      detail: 'Waiting for the worker to start the task.'
+    };
+  }
+  if (status === 'running') {
+    return {
+      title: `${fallbackLabel} running`,
+      detail: 'The build is in progress. This can take a while for long-running skills.'
+    };
+  }
+  if (status === 'completed') {
+    return {
+      title: `${fallbackLabel} completed`,
+      detail: 'Build finished successfully.'
+    };
+  }
+  if (status === 'failed') {
+    return {
+      title: `${fallbackLabel} failed`,
+      detail: task?.error || 'The task failed.'
+    };
+  }
+  return {
+    title: `${fallbackLabel} ${status}`,
+    detail: 'Task status updated.'
+  };
+}
+
+function createStatusUpdater(label, runningDetail) {
+  return (task) => {
+    const status = typeof task?.status === 'string' ? task.status.toLowerCase() : 'queued';
+    if (status === 'running') {
+      setBuildState(true, `${label} running`, runningDetail);
+      return;
+    }
+    const statusView = describeTaskUpdate(task, label);
+    setBuildState(true, statusView.title, statusView.detail);
+  };
+}
+
 async function loadVariables() {
-  const data = await callTool('soplang-tool', { pluginName: 'SoplangBuilder', methodName: 'getVariablesWithValues', params: [] });
+  const data = await callTool('get_variables_with_values');
   variables = Array.isArray(data) ? data : [];
   renderVars();
 }
@@ -42,16 +109,67 @@ async function rebuild() {
   const btn = document.getElementById('start-build');
   btn.disabled = true;
   try {
-    const result = await callTool('soplang-tool', { pluginName: 'SoplangBuilder', methodName: 'buildFromMarkdown', params: [] });
+    setBuildState(true, 'Sync markdown queued', 'Waiting for the sync task to start.');
+    const result = await callTool('sync_markdown_documents', {}, {
+      onTaskUpdate: createStatusUpdater(
+        'Sync variables',
+        'Scanning workspace documents and refreshing the SOPLang workspace.'
+      )
+    });
     warnings = Array.isArray(result?.warnings) ? result.warnings : [];
     errors = Array.isArray(result?.errors) ? result.errors : [];
+    setBuildState(true, 'Loading variables', 'Sync finished. Refreshing variables.');
     await loadVariables();
     renderErrors();
+    setBuildState(false, 'Idle', 'No build running.');
   } catch (err) {
     errors = [err.message || 'Build failed'];
     renderErrors();
+    setBuildState(true, 'Sync failed', err.message || 'Sync failed.');
   } finally {
     btn.disabled = false;
+  }
+}
+
+async function executeBuild() {
+  const btn = document.getElementById('execute-build');
+  const syncBtn = document.getElementById('start-build');
+  btn.disabled = true;
+  syncBtn.disabled = true;
+  try {
+    setBuildState(true, 'Sync variables queued', 'Waiting for the sync task to start.');
+    const syncResult = await callTool('sync_markdown_documents', {}, {
+      onTaskUpdate: createStatusUpdater(
+        'Sync variables',
+        'Scanning workspace documents and preparing the build plan.'
+      )
+    });
+    warnings = Array.isArray(syncResult?.warnings) ? syncResult.warnings : [];
+
+    const isFullBuild = Boolean(syncResult?.requiresFullBuild);
+    const buildToolName = isFullBuild ? 'execute_workspace_build' : 'execute_incremental_build';
+    const buildLabel = isFullBuild ? 'Full build' : 'Incremental build';
+
+    setBuildState(true, `${buildLabel} queued`, 'Waiting for the build task to start.');
+    const buildResult = await callTool(buildToolName, {}, {
+      onTaskUpdate(task) {
+        const statusView = describeTaskUpdate(task, buildLabel);
+        setBuildState(true, statusView.title, statusView.detail);
+      }
+    });
+
+    errors = Array.isArray(buildResult?.errors) ? buildResult.errors : [];
+    setBuildState(true, 'Loading variables', 'Build finished. Refreshing variables.');
+    await loadVariables();
+    renderErrors();
+    setBuildState(false, 'Idle', 'No build running.');
+  } catch (err) {
+    errors = [err.message || 'Build execution failed'];
+    renderErrors();
+    setBuildState(true, 'Build failed', err.message || 'Build execution failed.');
+  } finally {
+    btn.disabled = false;
+    syncBtn.disabled = false;
   }
 }
 
@@ -110,10 +228,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
 });
 
 document.getElementById('start-build').addEventListener('click', rebuild);
-document.getElementById('refresh-status').addEventListener('click', () => {
-  renderErrors();
-  renderVars();
-});
+document.getElementById('execute-build').addEventListener('click', executeBuild);
 
 function showModal(content) {
   const backdrop = document.getElementById('var-modal');
@@ -147,4 +262,5 @@ function attachVarClicks() {
 
 loadVariables();
 renderErrors();
+renderBuildState();
 switchTab('errors');

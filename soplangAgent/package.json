@@ -2,7 +2,7 @@
     "name": "SOPLangBuilder",
     "type": "module",
     "scripts": {
-        "postinstall": "mkdir -p node_modules && cd node_modules && if [ ! -d achillesAgentLib ]; then git clone https://github.com/OutfinityResearch/achillesAgentLib.git; fi"
+        "test": "node --test ./tests/*.test.mjs"
     },
     "dependencies": {
         "flexsearch": "^0.7.31",

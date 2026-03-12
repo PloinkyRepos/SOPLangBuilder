@@ -30,7 +30,6 @@ const normalizeBaseUrl = (value) => {
   if (!value || typeof value !== "string") return null;
   try {
     const url = new URL(value);
-    // Strip trailing slash to avoid double slashes when joining paths
     return url.toString().replace(/\/+$/, "");
   } catch {
     return null;
@@ -154,15 +153,12 @@ const normalizeMediaList = (raw) => {
             flat.push(candidate);
             continue;
           }
-          // Fallback: collect any string keys/values as candidates
           Object.keys(parsed).forEach((k) => pushIfUrlish(k));
           Object.values(parsed).forEach((v) => pushIfUrlish(typeof v === "string" ? v : ""));
           continue;
         }
       } catch (_) {
-        // not JSON, fall through
       }
-      // Extract URLs if present in the raw string
       const urlMatches = trimmed.match(/https?:[^\\s"']+/g);
       if (urlMatches && urlMatches.length) {
         flat.push(...urlMatches);
@@ -182,7 +178,6 @@ const normalizeMediaList = (raw) => {
   }
   return flat;
 };
-
 
 const downloadToFile = async (url, targetPath) => {
   const targetUrl = normalizeUrlForContainer(url);
@@ -253,233 +248,93 @@ const pickFfmpegBin = () => {
       continue;
     }
     try {
-      fs.chmodSync(bin, '755');
+      fs.chmodSync(bin, "755");
     } catch (e) {
-      // Ignore errors
     }
     try {
       fs.accessSync(bin, fs.constants.X_OK);
       return bin;
     } catch (e) {
-      continue;
     }
   }
-  try {
-    fs.accessSync("ffmpeg", fs.constants.X_OK);
-    return "ffmpeg";
-  } catch {
-    return null;
-  }
-};
-
-
-const runFFmpeg = (args) => {
-  return new Promise((resolve, reject) => {
-    const bin = pickFfmpegBin();
-    if (!bin) {
-      return reject(new Error("FFmpeg binary not found. Install ffmpeg or set FFMPEG_BIN/FFMPEG_PATH."));
-    }
-    const proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stderr = "";
-    proc.stderr.on("data", (d) => (stderr += d.toString()));
-    proc.on("error", (err) => {
-      if (err?.code === "ENOENT") {
-        reject(new Error(`FFmpeg executable not found at ${bin}. Install ffmpeg or set FFMPEG_BIN/FFMPEG_PATH.`));
-      } else {
-        reject(err);
-      }
-    });
-    proc.on("close", (code) => {
-      if (code === 0) return resolve();
-      reject(new Error(stderr || `ffmpeg exited with code ${code}`));
-    });
-  });
-};
-
-const parseInput = (input, workDir) => {
-  if (input && typeof input === "object" && !Array.isArray(input)) {
-    return { ...input };
-  }
-  if (typeof input === "string") {
-    const trimmed = input.trim();
-    if (!trimmed) return {};
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return { images: [path.isAbsolute(trimmed) ? trimmed : path.resolve(workDir, trimmed)] };
-    }
-  }
-  return {};
+  return ffmpegStatic || "ffmpeg";
 };
 
 export default async function ffmpegImageToVideo(input, context = {}) {
-  const workDir = context?.workingDir || process.cwd();
-  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ffmpeg-img2vid-"));
+  const payload = input && typeof input === "object" ? input : {};
+  const images = normalizeMediaList(payload.images || payload.image || payload.value);
+  if (!images.length) {
+    throw new Error("ffmpegImageToVideo requires at least one image");
+  }
+
+  const workDir = process.cwd();
+  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ffmpeg-image-to-video-"));
+  const fps = toNumber(payload.fps, 25);
+  const width = toNumber(payload.width, 1280);
+  const height = toNumber(payload.height, 720);
+  const duration = toNumber(payload.duration, 3);
+  const background = payload.bg || payload.background || "black";
+  const audio = payload.audio || null;
 
   try {
-    const opts = parseInput(input, workDir);
-    const duration = toNumber(opts.duration, 5);
-    const fps = toNumber(opts.fps, 30);
-    const width = toNumber(opts.width);
-    const height = toNumber(opts.height);
-    const bg = typeof opts.bg === "string" && opts.bg.trim() ? opts.bg.trim() : "black";
-
-    const images = normalizeMediaList(opts.images || opts.image);
-    const videos = normalizeMediaList(opts.videos || opts.video);
-    const audioList = normalizeMediaList(opts.audios || opts.audio);
-    if (!images.length && !videos.length) {
-      throw new Error("No images or videos provided");
+    const localImages = [];
+    for (let index = 0; index < images.length; index += 1) {
+      const localPath = await ensureLocalPath(images[index], workDir, tempDir, `image-${index}`);
+      localImages.push(localPath);
     }
 
-    const vfParts = [];
-    if (width && height) {
-        vfParts.push(`scale=${width}:${height}:force_original_aspect_ratio=decrease`);
-        vfParts.push(`pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:${bg}`);
-    }
-    if (fps) vfParts.push(`fps=${fps}`);
-    vfParts.push("format=yuv420p");
-    const vf = vfParts.join(",");
+    const concatPath = path.join(tempDir, "images.txt");
+    const concatContent = localImages.map((localPath) => `file '${localPath.replace(/'/g, "'\\''")}'\nduration ${duration}\n`).join("");
+    await fsp.writeFile(concatPath, concatContent, "utf8");
 
-    const segments = [];
-
-    if (images.length) {
-      const perImageDuration = duration && duration > 0 ? duration / images.length : 1;
-      for (let i = 0; i < images.length; i++) {
-          const local = await ensureLocalPath(images[i], workDir, tempDir, `image-${i + 1}`);
-          const imageSegment = path.join(tempDir, `segment-image-${i + 1}-${Date.now()}.mp4`);
-          const args = [
-            "-y",
-            "-loop", "1",
-            "-t", String(perImageDuration),
-            "-i", local,
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-shortest"
-          ];
-          if (vf) args.push("-vf", vf);
-          if (fps) args.push("-r", String(fps));
-          args.push(imageSegment);
-          await runFFmpeg(args);
-          segments.push(imageSegment);
-      }
+    let audioPath = null;
+    if (audio) {
+      audioPath = await ensureLocalPath(audio, workDir, tempDir, "audio");
     }
 
-    if (videos.length) {
-      for (let i = 0; i < videos.length; i++) {
-        const src = await ensureLocalPath(videos[i], workDir, tempDir, `video-${i + 1}`);
-        const out = path.join(tempDir, `segment-video-${i + 1}-${Date.now()}.mp4`);
-        const args = [
-          "-y",
-          "-i", src,
-          "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-          "-map", "0:v:0",
-          "-map", "1:a:0",
-          "-c:v", "libx264",
-          "-pix_fmt", "yuv420p",
-          "-c:a", "aac",
-          "-shortest"
-        ];
-        if (vf) args.push("-vf", vf);
-        if (fps) args.push("-r", String(fps));
-        args.push(out);
-        await runFFmpeg(args);
-        segments.push(out);
-      }
-    }
-
-    const concatListFile = path.join(tempDir, `concat-${Date.now()}.txt`);
-    const concatContent = segments.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n");
-    await fsp.writeFile(concatListFile, concatContent, "utf8");
-
-    const concatOutput = path.join(tempDir, `concat-${Date.now()}.mp4`);
-    const concatArgs = [
+    const outputPath = path.join(tempDir, "out.mp4");
+    const ffmpegArgs = [
       "-y",
-      "-f", "concat", "-safe", "0", "-i", concatListFile,
-      "-c:v", "libx264",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-ar", "48000"
+      "-f", "concat",
+      "-safe", "0",
+      "-i", concatPath,
+      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=${background}`,
+      "-r", String(fps)
     ];
-    if (fps) concatArgs.push("-r", String(fps));
-    concatArgs.push(concatOutput);
-    await runFFmpeg(concatArgs);
 
-    const finalOutputName = opts.output || `image-to-video-${Date.now()}.mp4`;
-    const finalOutputPath = path.isAbsolute(finalOutputName) ? finalOutputName : path.join(tempDir, finalOutputName);
-
-    let outputPath = concatOutput;
-    const audioPaths = [];
-    for (let i = 0; i < audioList.length; i++) {
-      audioPaths.push(await ensureLocalPath(audioList[i], workDir, tempDir, `audio-${i + 1}`));
+    if (audioPath) {
+      ffmpegArgs.push("-i", audioPath, "-shortest");
     }
 
-    if (audioPaths.length) {
-      const audioInputs = [];
-      for (const a of audioPaths) {
-        audioInputs.push("-i", a);
-      }
-      const audioStreams = Array.from({ length: audioPaths.length + 1 }, (_, idx) => `[${idx}:a]`).join("");
-      const filter = `${audioStreams}amix=inputs=${audioPaths.length + 1}:duration=shortest:dropout_transition=0[aout]`;
-      const mixArgs = [
-        "-y",
-        "-i", concatOutput,
-        ...audioInputs,
-        "-filter_complex", filter,
-        "-map", "0:v",
-        "-map", "[aout]",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        "-shortest"
-      ];
-      if (duration) mixArgs.push("-t", String(duration));
-      mixArgs.push(finalOutputPath);
-      await runFFmpeg(mixArgs);
-      outputPath = finalOutputPath;
-    } else if (duration) {
-      const trimArgs = [
-        "-y",
-        "-i", concatOutput,
-        "-t", String(duration),
-        "-c:v", "copy",
-        "-c:a", "copy",
-        finalOutputPath
-      ];
-      await runFFmpeg(trimArgs);
-      outputPath = finalOutputPath;
-    } else if (finalOutputPath !== concatOutput) {
-      await fsp.copyFile(concatOutput, finalOutputPath);
-      outputPath = finalOutputPath;
-    }
+    ffmpegArgs.push(
+      "-pix_fmt", "yuv420p",
+      "-c:v", "libx264",
+      outputPath
+    );
 
-    const size = (await fsp.stat(outputPath)).size;
-    const uploadResult = await uploadToBlobStore(outputPath, "video/mp4", {
-      agentId: context?.agentId,
-      blobBaseUrl: context?.blobBaseUrl
+    const ffmpegBin = pickFfmpegBin();
+    await new Promise((resolve, reject) => {
+      const child = spawn(ffmpegBin, ffmpegArgs, { stdio: ["ignore", "pipe", "pipe"] });
+      let stderr = "";
+      child.stderr.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(stderr || `ffmpeg exited with code ${code}`));
+      });
     });
-    const downloadPath = uploadResult.downloadUrl || uploadResult.localPath || null;
 
+    const uploaded = await uploadToBlobStore(outputPath, "video/mp4", context || {});
     return {
-        type: "video",
-        id: uploadResult.id,
-        agentId: uploadResult.agentId,
-        path: downloadPath,
-        value: downloadPath,
-        localPath: uploadResult.localPath,
-        downloadUrl: uploadResult.downloadUrl,
-        duration,
-        fps,
-        width: width || null,
-        height: height || null,
-        size,
-        format: "mp4",
-        filename: path.basename(finalOutputPath),
-        mime: "video/mp4"
+      value: uploaded.downloadUrl || uploaded.localPath || uploaded.id || "",
+      ...uploaded
     };
   } finally {
-      await fsp.rm(tempDir, { recursive: true, force: true });
+    await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
