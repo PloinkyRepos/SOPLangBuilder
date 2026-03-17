@@ -40,10 +40,22 @@ export const deriveInvocation = (toolName, payload = {}) => {
                 methodName: "getVariablesWithValues",
                 params: []
             };
+        case "get_commands":
+            return {
+                pluginName: "SoplangBuilder",
+                methodName: "getCommands",
+                params: []
+            };
+        case "get_types":
+            return {
+                pluginName: "SoplangBuilder",
+                methodName: "getCustomTypes",
+                params: []
+            };
         case "execute_skill": {
             const params = [payload.skillName];
-            if (payload.args !== undefined) {
-                params.push(payload.args);
+            if (payload.promptText !== undefined) {
+                params.push(payload.promptText);
             }
             return {
                 pluginName: "AchillesSkills",

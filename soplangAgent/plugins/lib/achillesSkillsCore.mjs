@@ -1,43 +1,3 @@
-export const normalizeValue = (value) => {
-    if (value === undefined || value === null) {
-        return value;
-    }
-
-    if (typeof value === "string") {
-        const trimmed = value.trim();
-        if (!trimmed) {
-            return "";
-        }
-        try {
-            return JSON.parse(trimmed);
-        } catch {
-            return trimmed;
-        }
-    }
-
-    return value;
-};
-
-export const parseArgs = (inputValues) => {
-    if (!inputValues || !inputValues.length) {
-        return {};
-    }
-
-    if (inputValues.length === 1) {
-        return normalizeValue(inputValues[0]);
-    }
-
-    if (inputValues.length % 2 === 0) {
-        const result = {};
-        for (let i = 0; i < inputValues.length; i += 2) {
-            result[String(inputValues[i])] = normalizeValue(inputValues[i + 1]);
-        }
-        return result;
-    }
-
-    return { value: inputValues.map((value) => normalizeValue(value)) };
-};
-
 export const createAchillesSkills = async ({
     workspace,
     AgentClass,
@@ -87,26 +47,14 @@ export const createAchillesSkills = async ({
 
                 workspace.registerCommand(commandName, async (inputValues) => {
                     await ensureAgent();
-                    const parsed = parseArgs(inputValues);
-                    if (record.type === "code") {
-                        const baseArgs = (parsed && typeof parsed === "object" && !Array.isArray(parsed))
-                            ? { ...parsed }
-                            : { value: parsed };
-                        if (baseArgs.input === undefined) {
-                            try {
-                                baseArgs.input = JSON.stringify(baseArgs);
-                            } catch {
-                                baseArgs.input = String(baseArgs.value ?? "");
-                            }
-                        }
-                        const out = await agent.executeWithReviewMode("", { skillName: record.name, args: baseArgs }, "none");
-                        if (out && typeof out === "object" && Object.prototype.hasOwnProperty.call(out, "result")) {
-                            return out.result;
-                        }
-                        return out;
+                    const promptText = Array.isArray(inputValues)
+                        ? inputValues.join(" ")
+                        : (typeof inputValues === "string" ? inputValues : "");
+                    const out = await agent.executeWithReviewMode(promptText, { skillName: record.name }, "none");
+                    if (out && typeof out === "object" && Object.prototype.hasOwnProperty.call(out, "result")) {
+                        return out.result;
                     }
-
-                    return agent.executeWithReviewMode("", { skillName: record.name, args: parsed }, "none");
+                    return out;
                 });
 
                 registered.add(commandName);
@@ -125,23 +73,18 @@ export const createAchillesSkills = async ({
             return registerSkills();
         },
 
-        async executeSkill(skillName, args = {}) {
+        async executeSkill(skillName, promptText = "") {
             if (!skillName || typeof skillName !== "string") {
                 throw new Error("skillName is required");
             }
 
-            let parsedArgs = args;
-            if (typeof parsedArgs === "string") {
-                try {
-                    parsedArgs = JSON.parse(parsedArgs);
-                } catch (_) {
-                    // Keep raw string if it is not JSON.
-                }
-            }
+            const text = Array.isArray(promptText)
+                ? promptText.join(" ")
+                : (typeof promptText === "string" ? promptText : "");
 
             await registerSkills();
             await ensureAgent();
-            const result = await agent.executeWithReviewMode("", { skillName, args: parsedArgs }, "none");
+            const result = await agent.executeWithReviewMode(text, { skillName }, "none");
             if (result && typeof result === "object" && Object.prototype.hasOwnProperty.call(result, "result")) {
                 return result.result;
             }

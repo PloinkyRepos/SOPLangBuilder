@@ -73,6 +73,28 @@
             "inputSchema": {}
         },
         {
+            "name": "get_commands",
+            "title": "Get Commands",
+            "description": "Return the registered SOPLang commands from the workspace.",
+            "command": "/code/soplang-tool.sh",
+            "cwd": "workspace",
+            "env": {
+                "TOOL_NAME": "get_commands"
+            },
+            "inputSchema": {}
+        },
+        {
+            "name": "get_types",
+            "title": "Get Custom Types",
+            "description": "Return the registered SOPLang custom types from the workspace.",
+            "command": "/code/soplang-tool.sh",
+            "cwd": "workspace",
+            "env": {
+                "TOOL_NAME": "get_types"
+            },
+            "inputSchema": {}
+        },
+        {
             "name": "execute_skill",
             "title": "Execute Skill",
             "description": "Execute a discovered Achilles skill through the AchillesSkills bridge.",
@@ -87,9 +109,9 @@
                     "description": "Skill name",
                     "optional": false
                 },
-                "args": {
-                    "type": "object",
-                    "description": "Skill arguments",
+                "promptText": {
+                    "type": "string",
+                    "description": "Prompt text passed to the skill",
                     "optional": true
                 }
             }

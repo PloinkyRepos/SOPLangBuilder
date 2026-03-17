@@ -438,6 +438,14 @@ export const createSoplangBuilder = ({
             return getVariablesWithValues(workspace);
         },
 
+        async getCommands() {
+            return workspace.listCommands();
+        },
+
+        async getCustomTypes() {
+            return workspace.getCustomTypes();
+        },
+
         async buildFromSpecsMarkdown(root = null) {
             const startedAt = Date.now();
             const searchRoot = root || await resolveWorkspaceRoot();

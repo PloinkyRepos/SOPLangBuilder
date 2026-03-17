@@ -269,8 +269,8 @@ test("executeSkill forwards payload through the Achilles bridge", async () => {
             FakeAgent.instance = this;
         }
 
-        async executeWithReviewMode(_prompt, payload, reviewMode) {
-            this.calls.push({ payload, reviewMode });
+        async executeWithReviewMode(promptText, payload, reviewMode) {
+            this.calls.push({ promptText, payload, reviewMode });
             return { result: { ok: true, payload } };
         }
     }
@@ -281,21 +281,20 @@ test("executeSkill forwards payload through the Achilles bridge", async () => {
         startDir: "/tmp"
     });
 
-    const result = await bridge.executeSkill("demo", { alpha: 1 });
+    const result = await bridge.executeSkill("demo", "alpha 1");
 
     assert.equal(registeredCommands.has("demo"), true);
     assert.equal(registeredCommands.has("d"), true);
     assert.deepEqual(result, {
         ok: true,
         payload: {
-            skillName: "demo",
-            args: { alpha: 1 }
+            skillName: "demo"
         }
     });
     assert.deepEqual(FakeAgent.instance.calls[0], {
+        promptText: "alpha 1",
         payload: {
-            skillName: "demo",
-            args: { alpha: 1 }
+            skillName: "demo"
         },
         reviewMode: "none"
     });
@@ -332,10 +331,20 @@ test("deriveInvocation maps MCP tools to plugin methods", async () => {
         methodName: "getVariablesWithValues",
         params: []
     });
-    assert.deepEqual(deriveInvocation("execute_skill", { skillName: "demo", args: { x: 1 } }), {
+    assert.deepEqual(deriveInvocation("get_commands"), {
+        pluginName: "SoplangBuilder",
+        methodName: "getCommands",
+        params: []
+    });
+    assert.deepEqual(deriveInvocation("get_types"), {
+        pluginName: "SoplangBuilder",
+        methodName: "getCustomTypes",
+        params: []
+    });
+    assert.deepEqual(deriveInvocation("execute_skill", { skillName: "demo", promptText: "alpha 1" }), {
         pluginName: "AchillesSkills",
         methodName: "executeSkill",
-        params: ["demo", { x: 1 }]
+        params: ["demo", "alpha 1"]
     });
 });
 
