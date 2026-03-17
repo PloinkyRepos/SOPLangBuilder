@@ -6,7 +6,9 @@ import { createAchillesSkills } from "./lib/achillesSkillsCore.mjs";
 async function AchillesSkills() {
     const workspace = $$.loadPlugin("Workspace");
     const pluginDir = path.dirname(fileURLToPath(import.meta.url));
-    const startDir = path.resolve(pluginDir, "..");
+    const startDir = process.env.PLOINKY_WORKSPACE_ROOT
+        ? path.resolve(process.env.PLOINKY_WORKSPACE_ROOT)
+        : path.resolve(pluginDir, "..");
     return createAchillesSkills({
         workspace,
         AgentClass: RecursiveSkilledAgent,

@@ -23,7 +23,7 @@ export const createAchillesSkills = async ({
 
         agent = new AgentClass({
             startDir,
-            searchUpwards: true
+            searchUpwards: false
         });
 
         if (Array.isArray(agent.pendingPreparations) && agent.pendingPreparations.length) {
