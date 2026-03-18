@@ -1,4 +1,4 @@
-import attach from "./attach.js";
+import attach from "./attach.mjs";
 
 export async function action(args = {}) {
   const { input, ...context } = args || {};
