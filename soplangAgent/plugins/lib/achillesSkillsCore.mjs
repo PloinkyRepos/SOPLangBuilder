@@ -52,20 +52,19 @@ export const createAchillesSkills = async ({
         });
 
         for (const record of skills) {
-            const names = [record.name, record.shortName].filter(Boolean);
-            for (const commandName of names) {
-                if (registered.has(commandName)) {
-                    continue;
-                }
+            const commandName = record.name;
+            if (!commandName || registered.has(commandName)) {
+                continue;
+            }
 
-                debug.log("[AchillesSkills] Registering command", {
-                    commandName,
-                    skillName: record.name,
-                    type: record.type,
-                    shortName: record.shortName || ""
-                });
+            debug.log("[AchillesSkills] Registering command", {
+                commandName,
+                skillName: record.name,
+                type: record.type,
+                shortName: record.shortName || ""
+            });
 
-                workspace.registerCommand(commandName, async (inputValues) => {
+            workspace.registerCommand(commandName, async (inputValues) => {
                     await ensureAgent();
                     const promptText = Array.isArray(inputValues)
                         ? inputValues.join(" ")
@@ -77,8 +76,7 @@ export const createAchillesSkills = async ({
                     return out;
                 });
 
-                registered.add(commandName);
-            }
+            registered.add(commandName);
         }
 
         debug.log("[AchillesSkills] Command registration complete", {

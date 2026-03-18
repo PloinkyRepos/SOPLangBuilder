@@ -54,6 +54,28 @@ const appendLog = (msg) => {
     }
 };
 
+const writeStderr = (...args) => {
+    const text = args.map((arg) => {
+        if (arg === undefined) return 'undefined';
+        if (arg === null) return 'null';
+        if (typeof arg === 'string') return arg;
+        try {
+            return JSON.stringify(arg);
+        } catch {
+            return String(arg);
+        }
+    }).join(' ');
+    try {
+        process.stderr.write(text + '\n');
+    } catch (_) {}
+};
+
+console.log = writeStderr;
+console.info = writeStderr;
+console.warn = writeStderr;
+console.error = writeStderr;
+console.debug = writeStderr;
+
 if (typeof globalThis.$$.throwError === 'undefined') {
     globalThis.$$.throwError = async function throwError(error, ...args) {
         if (typeof error === 'string') {

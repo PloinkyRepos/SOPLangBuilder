@@ -20,7 +20,7 @@ const extractMcpText = (result) => {
       if (typeof item?.data === 'string') return item.data;
       return '';
     })
-    .filter(Boolean)
+    .filter((text) => text && !text.startsWith('stderr:'))
     .join('\n');
 };
 
