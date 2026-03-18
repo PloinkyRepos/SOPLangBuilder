@@ -3,7 +3,10 @@
     "container": "node:20-bullseye",
     "profiles": {
         "default": {
-            "install": "/code/scripts/install.sh"
+            "install": "/code/scripts/install.sh",
+            "env": [
+                "ACHILLES_DEBUG"
+            ]
         }
     }
 }

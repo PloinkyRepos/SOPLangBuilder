@@ -1,3 +1,5 @@
+import debug from "../debugLogger.mjs";
+
 export const createAchillesSkills = async ({
     workspace,
     AgentClass,
@@ -21,6 +23,12 @@ export const createAchillesSkills = async ({
             return agent;
         }
 
+        debug.log("[AchillesSkills] Initializing RecursiveSkilledAgent", {
+            startDir,
+            searchUpwards: false,
+            workspaceRoot: process.env.PLOINKY_WORKSPACE_ROOT || "(not set)"
+        });
+
         agent = new AgentClass({
             startDir,
             searchUpwards: false
@@ -38,12 +46,24 @@ export const createAchillesSkills = async ({
         await ensureAgent();
         const skills = Array.from(agent.skillCatalog.values());
 
+        debug.log("[AchillesSkills] Skills discovered", {
+            count: skills.length,
+            names: skills.map((record) => record.name)
+        });
+
         for (const record of skills) {
             const names = [record.name, record.shortName].filter(Boolean);
             for (const commandName of names) {
                 if (registered.has(commandName)) {
                     continue;
                 }
+
+                debug.log("[AchillesSkills] Registering command", {
+                    commandName,
+                    skillName: record.name,
+                    type: record.type,
+                    shortName: record.shortName || ""
+                });
 
                 workspace.registerCommand(commandName, async (inputValues) => {
                     await ensureAgent();
@@ -61,6 +81,10 @@ export const createAchillesSkills = async ({
             }
         }
 
+        debug.log("[AchillesSkills] Command registration complete", {
+            skills: skills.length,
+            commands: registered.size
+        });
         return skills.length;
     };
 
