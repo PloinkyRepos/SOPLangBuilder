@@ -191,6 +191,27 @@ function renderErrors() {
   body.innerHTML = lines.join('');
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function toValueString(value) {
+  if (value === undefined) return '—';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (_) {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 function renderVars() {
   const body = document.getElementById('vars-body');
   if (!variables.length) {
@@ -206,7 +227,19 @@ function renderVars() {
         <td>${v.errorInfo ? errSvg : okSvg}</td>
         <td>${v.varName || v.name || v.varId || '—'}</td>
         <td>${v.docId || v.documentId || '—'}</td>
-        <td>${v.value === undefined ? '—' : (typeof v.value === 'object' ? JSON.stringify(v.value) : v.value)}</td>
+        <td>${(() => {
+          const varName = v.varName || v.name || v.varId || 'var';
+          const valueText = toValueString(v.value);
+          const singleLine = valueText.replace(/\s+/g, ' ').trim();
+          const maxLength = 25;
+          const shouldShowMore = singleLine.length > maxLength || valueText.includes('\n');
+          const preview = shouldShowMore ? singleLine.slice(0, maxLength) + '…' : singleLine;
+          const previewHtml = `<span class="value-preview">${escapeHtml(preview)}</span>`;
+          if (!shouldShowMore) {
+            return previewHtml;
+          }
+          return `${previewHtml}<span class="pointer show-more" data-action="show-value" data-name="${escapeHtml(varName)}">Show more</span>`;
+        })()}</td>
         <td><span class="pointer eye-icon" data-name="${v.varName || v.name || 'var'}">${eyeSvg}</span></td>
       </tr>
     `)
@@ -230,10 +263,12 @@ document.querySelectorAll('.tab').forEach((tab) => {
 document.getElementById('start-build').addEventListener('click', rebuild);
 document.getElementById('execute-build').addEventListener('click', executeBuild);
 
-function showModal(content) {
+function showModal(title, content) {
   const backdrop = document.getElementById('var-modal');
+  const modalTitle = document.getElementById('var-modal-title');
   const body = document.getElementById('var-modal-body');
-  body.textContent = content;
+  modalTitle.textContent = title || 'Variable';
+  body.value = content;
   backdrop.style.display = 'flex';
 }
 
@@ -250,13 +285,24 @@ document.getElementById('var-modal').addEventListener('click', (e) => {
 function attachVarClicks() {
   document.querySelectorAll('#vars-body tr').forEach((row) => {
     const icon = row.querySelector('.eye-icon');
-    if (!icon) return;
-    icon.addEventListener('click', () => {
-      const name = icon.dataset.name;
-      const variable = variables.find(v => (v.varName || v.name || v.varId) === name);
-      if (!variable) return;
-      showModal(JSON.stringify(variable, null, 2));
-    });
+    if (icon) {
+      icon.addEventListener('click', () => {
+        const name = icon.dataset.name;
+        const variable = variables.find(v => (v.varName || v.name || v.varId) === name);
+        if (!variable) return;
+        showModal('Variable details', JSON.stringify(variable, null, 2));
+      });
+    }
+    const showMore = row.querySelector('[data-action="show-value"]');
+    if (showMore) {
+      showMore.addEventListener('click', () => {
+        const name = showMore.dataset.name;
+        const variable = variables.find(v => (v.varName || v.name || v.varId) === name);
+        if (!variable) return;
+        const valueText = toValueString(variable.value);
+        showModal(name, valueText);
+      });
+    }
   });
 }
 
