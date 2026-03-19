@@ -6,6 +6,7 @@ const client = createAgentClient(SOPLANG_MCP);
 let warnings = [];
 let errors = [];
 let variables = [];
+let showAllVariables = false;
 let buildState = {
   active: false,
   title: 'Idle',
@@ -103,6 +104,13 @@ async function loadVariables() {
   const data = await callTool('get_variables_with_values');
   variables = Array.isArray(data) ? data : [];
   renderVars();
+}
+
+function getVisibleVariables() {
+  if (showAllVariables) {
+    return variables;
+  }
+  return variables.filter((variable) => variable?.isActive !== false);
 }
 
 async function rebuild() {
@@ -214,14 +222,16 @@ function toValueString(value) {
 
 function renderVars() {
   const body = document.getElementById('vars-body');
-  if (!variables.length) {
-    body.innerHTML = '<tr><td colspan="5" class="table-message">No variables</td></tr>';
+  const visible = getVisibleVariables();
+  if (!visible.length) {
+    const message = showAllVariables ? 'No variables' : 'No active variables';
+    body.innerHTML = `<tr><td colspan="5" class="table-message">${message}</td></tr>`;
     return;
   }
   const eyeSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>';
   const okSvg = '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg>';
   const errSvg = '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>';
-  body.innerHTML = variables
+  body.innerHTML = visible
     .map((v) => `
       <tr>
         <td>${v.errorInfo ? errSvg : okSvg}</td>
@@ -262,6 +272,15 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 document.getElementById('start-build').addEventListener('click', rebuild);
 document.getElementById('execute-build').addEventListener('click', executeBuild);
+
+const showAllCheckbox = document.getElementById('show-all-vars');
+if (showAllCheckbox) {
+  showAllCheckbox.checked = false;
+  showAllCheckbox.addEventListener('change', (event) => {
+    showAllVariables = Boolean(event.target.checked);
+    renderVars();
+  });
+}
 
 function showModal(title, content) {
   const backdrop = document.getElementById('var-modal');

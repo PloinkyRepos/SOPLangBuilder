@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { debug as defaultDebug } from "../debugLogger.mjs";
 import { registerAchillesCLISOPlangCommands } from "./builderCommands.mjs";
 import { parseDocsFromMarkdown } from "./markdownMetadata.mjs";
+import { parseCommandsForUI } from "../../node_modules/soplang/src/util/soplangUtil.js";
 import { pickWorkspaceRoot, walkMarkdownFiles } from "./workspaceRoots.mjs";
 
 const parseMaybeJson = (value) => {
@@ -104,6 +105,44 @@ const collectDocumentTemplates = async (files, {
     }
 
     return docTemplates;
+};
+
+const collectActiveVarsFromTemplates = (docTemplates) => {
+    const activeByDoc = new Map();
+
+    const addCommands = (docId, commands) => {
+        if (!docId || !commands || !commands.trim()) {
+            return;
+        }
+        const parsed = parseCommandsForUI(commands);
+        if (!parsed.length) {
+            return;
+        }
+        let set = activeByDoc.get(docId);
+        if (!set) {
+            set = new Set();
+            activeByDoc.set(docId, set);
+        }
+        parsed.forEach((command) => {
+            if (command?.varName) {
+                set.add(command.varName);
+            }
+        });
+    };
+
+    Object.values(docTemplates).forEach((doc) => {
+        addCommands(doc.docId, doc.commands);
+        const chapters = Array.isArray(doc.chapters) ? doc.chapters : [];
+        chapters.forEach((chapter) => {
+            addCommands(doc.docId, chapter?.commands || "");
+            const paragraphs = Array.isArray(chapter?.paragraphs) ? chapter.paragraphs : [];
+            paragraphs.forEach((paragraph) => {
+                addCommands(doc.docId, paragraph?.commands || "");
+            });
+        });
+    });
+
+    return activeByDoc;
 };
 
 const resetExistingDocument = async (documents, docId, docTemplate) => {
@@ -322,7 +361,25 @@ const collectSpecsSoplangCode = async (files, {
     };
 };
 
-export const getVariablesWithValues = async (workspace) => {
+export const getVariablesWithValues = async (workspace, {
+    resolveWorkspaceRoot,
+    listMarkdownFiles,
+    fsModule = fs,
+    pathModule = path
+} = {}) => {
+    let activeByDoc = null;
+    if (resolveWorkspaceRoot && listMarkdownFiles) {
+        try {
+            const root = await resolveWorkspaceRoot();
+            const files = await listMarkdownFiles(root);
+            if (files.length) {
+                const templates = await collectDocumentTemplates(files, { fsModule, pathModule });
+                activeByDoc = collectActiveVarsFromTemplates(templates);
+            }
+        } catch (_) {
+            activeByDoc = null;
+        }
+    }
     const vars = await workspace.getEveryVariableObject();
     const enriched = [];
 
@@ -330,6 +387,14 @@ export const getVariablesWithValues = async (workspace) => {
         const entry = { ...variable };
         const varName = entry.varName || entry.name || entry.varId;
         const docId = entry.docId || entry.documentId;
+        if (activeByDoc) {
+            if (docId && varName) {
+                const set = activeByDoc.get(docId);
+                entry.isActive = Boolean(set && set.has(varName));
+            } else {
+                entry.isActive = true;
+            }
+        }
         if (!varName || !docId) {
             enriched.push(entry);
             continue;
@@ -435,7 +500,12 @@ export const createSoplangBuilder = ({
         },
 
         async getVariablesWithValues() {
-            return getVariablesWithValues(workspace);
+            return getVariablesWithValues(workspace, {
+                resolveWorkspaceRoot,
+                listMarkdownFiles,
+                fsModule,
+                pathModule
+            });
         },
 
         async getCommands() {

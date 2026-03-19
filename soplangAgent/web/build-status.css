@@ -88,6 +88,25 @@ body {
   background: #fef2f2;
 }
 .warning-item { background: #fffbeb; }
+.vars-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+  color: #374151;
+  font-size: 13px;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle input {
+  width: 16px;
+  height: 16px;
+}
 .vars-table {
   width: 100%;
   border-collapse: collapse;
