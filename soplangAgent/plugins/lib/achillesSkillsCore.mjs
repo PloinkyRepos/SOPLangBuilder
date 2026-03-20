@@ -66,6 +66,7 @@ export const createAchillesSkills = async ({
 
             workspace.registerCommand(commandName, async (inputValues) => {
                     await ensureAgent();
+                    debug.log(`[AchillesSkills] ${commandName} after ensureAgent() called `);
                     const promptText = Array.isArray(inputValues)
                         ? inputValues.join(" ")
                         : (typeof inputValues === "string" ? inputValues : "");
@@ -73,6 +74,7 @@ export const createAchillesSkills = async ({
                     if (out && typeof out === "object" && Object.prototype.hasOwnProperty.call(out, "result")) {
                         return out.result;
                     }
+                    debug.log(`[AchillesSkills] ${commandName} executed, result: ${out}`);
                     return out;
                 });
 

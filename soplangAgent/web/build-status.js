@@ -193,7 +193,10 @@ function renderErrors() {
     if (typeof e === 'object' && e.text) {
       lines.push(`<div class="error-item">${e.text}${e.err ? ` (${e.err})` : ''}</div>`);
     } else {
-      lines.push(`<div class="error-item">${e}</div>`);
+      const text = typeof e === 'object'
+        ? JSON.stringify(e, null, 2)
+        : String(e);
+      lines.push(`<div class="error-item">${text}</div>`);
     }
   });
   body.innerHTML = lines.join('');

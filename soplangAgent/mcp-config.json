@@ -73,6 +73,28 @@
             "inputSchema": {}
         },
         {
+            "name": "get_variable_with_value",
+            "title": "Get Variable with Value",
+            "description": "Return a single SOPLang variable with its resolved value and error info.",
+            "command": "/code/soplang-tool.sh",
+            "cwd": "workspace",
+            "env": {
+                "TOOL_NAME": "get_variable_with_value"
+            },
+            "inputSchema": {
+                "documentId": {
+                    "type": "string",
+                    "description": "Document ID",
+                    "optional": false
+                },
+                "varName": {
+                    "type": "string",
+                    "description": "Variable name",
+                    "optional": false
+                }
+            }
+        },
+        {
             "name": "get_commands",
             "title": "Get Commands",
             "description": "Return the registered SOPLang commands from the workspace.",

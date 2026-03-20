@@ -40,6 +40,12 @@ export const deriveInvocation = (toolName, payload = {}) => {
                 methodName: "getVariablesWithValues",
                 params: []
             };
+        case "get_variable_with_value":
+            return {
+                pluginName: "SoplangBuilder",
+                methodName: "getVariableWithValue",
+                params: [payload.documentId, payload.varName]
+            };
         case "get_commands":
             return {
                 pluginName: "SoplangBuilder",

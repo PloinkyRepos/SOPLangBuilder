@@ -508,6 +508,18 @@ export const createSoplangBuilder = ({
             });
         },
 
+        async getVariableWithValue(documentId, varName) {
+            if (!documentId || typeof documentId !== "string") {
+                throw new Error("documentId is required");
+            }
+            if (!varName || typeof varName !== "string") {
+                throw new Error("varName is required");
+            }
+            const variables = await workspace.getVariablesForDoc(documentId);
+            const variable = variables.find((item) => item.varName === varName);
+            return variable || null;
+        },
+
         async getCommands() {
             return workspace.listCommands();
         },
