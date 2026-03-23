@@ -138,6 +138,7 @@ async function rebuild() {
     errors = [err.message || 'Build failed'];
     renderErrors();
     setBuildState(true, 'Sync failed', err.message || 'Sync failed.', true);
+    await loadVariables();
   } finally {
     btn.disabled = false;
   }
@@ -179,6 +180,7 @@ async function executeBuild() {
     errors = [err.message || 'Build execution failed'];
     renderErrors();
     setBuildState(true, 'Build failed', err.message || 'Build execution failed.', true);
+    await loadVariables();
   } finally {
     btn.disabled = false;
     syncBtn.disabled = false;
