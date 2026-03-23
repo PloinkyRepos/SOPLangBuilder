@@ -38,6 +38,49 @@ async function callTool(name, args = {}, options = {}) {
   return result;
 }
 
+function humanizeBuildError(rawValue) {
+  const raw = typeof rawValue === 'string'
+    ? rawValue
+    : (rawValue?.message || String(rawValue || ''));
+
+  const normalized = raw.replace(/\s+/g, ' ').trim();
+  const isGateway502 =
+    /All model invocations failed:/i.test(normalized)
+    && /API Error \(502\)/i.test(normalized);
+  const isAxiologicGateway =
+    /soul\.axiologic\.dev/i.test(normalized)
+    || /axiologic\.dev \| 502/i.test(normalized)
+    || /Bad gateway/i.test(normalized);
+
+  if (isGateway502 || isAxiologicGateway) {
+    return {
+      text: 'The AI service is temporarily unavailable. Please try again in a few minutes.',
+      raw
+    };
+  }
+
+  return {
+    text: raw || 'Build execution failed.',
+    raw
+  };
+}
+
+function normalizeBuildErrorEntry(entry) {
+  if (entry && typeof entry === 'object' && entry.text && !entry.message && !entry.err) {
+    const friendly = humanizeBuildError(entry.text);
+    return {
+      text: friendly.text,
+      raw: friendly.raw,
+      err: entry.err || null
+    };
+  }
+
+  const raw = typeof entry === 'object' && entry?.message
+    ? entry.message
+    : entry;
+  return humanizeBuildError(raw);
+}
+
 function renderBuildState() {
   const strip = document.getElementById('build-status-strip');
   const title = document.getElementById('build-status-title');
@@ -135,9 +178,10 @@ async function rebuild() {
     renderErrors();
     setBuildState(false, 'Idle', 'No build running.');
   } catch (err) {
-    errors = [err.message || 'Build failed'];
+    const friendlyError = humanizeBuildError(err?.message || 'Build failed');
+    errors = [friendlyError];
     renderErrors();
-    setBuildState(true, 'Sync failed', err.message || 'Sync failed.', true);
+    setBuildState(true, 'Sync failed', friendlyError.text, true);
   } finally {
     btn.disabled = false;
   }
@@ -176,9 +220,10 @@ async function executeBuild() {
     renderErrors();
     setBuildState(false, 'Idle', 'No build running.');
   } catch (err) {
-    errors = [err.message || 'Build execution failed'];
+    const friendlyError = humanizeBuildError(err?.message || 'Build execution failed');
+    errors = [friendlyError];
     renderErrors();
-    setBuildState(true, 'Build failed', err.message || 'Build execution failed.', true);
+    setBuildState(true, 'Build failed', friendlyError.text, true);
   } finally {
     btn.disabled = false;
     syncBtn.disabled = false;
@@ -195,12 +240,20 @@ function renderErrors() {
   warnings.forEach((w) => lines.push(`<div class="warning-item">${w}</div>`));
   errors.forEach((e) => {
     if (typeof e === 'object' && e.text) {
-      lines.push(`<div class="error-item">${e.text}${e.err ? ` (${e.err})` : ''}</div>`);
+      const normalized = normalizeBuildErrorEntry(e);
+      const title = normalized.raw && normalized.raw !== normalized.text
+        ? ` title="${escapeHtml(normalized.raw)}"`
+        : '';
+      lines.push(`<div class="error-item"${title}>${escapeHtml(normalized.text)}${normalized.err ? ` (${escapeHtml(normalized.err)})` : ''}</div>`);
     } else {
-      const text = typeof e === 'object'
+      const raw = typeof e === 'object'
         ? JSON.stringify(e, null, 2)
         : String(e);
-      lines.push(`<div class="error-item">${text}</div>`);
+      const normalized = normalizeBuildErrorEntry(raw);
+      const title = normalized.raw && normalized.raw !== normalized.text
+        ? ` title="${escapeHtml(normalized.raw)}"`
+        : '';
+      lines.push(`<div class="error-item"${title}>${escapeHtml(normalized.text)}</div>`);
     }
   });
   body.innerHTML = lines.join('');
