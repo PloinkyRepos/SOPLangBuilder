@@ -42,16 +42,20 @@ function renderBuildState() {
   const strip = document.getElementById('build-status-strip');
   const title = document.getElementById('build-status-title');
   const detail = document.getElementById('build-status-detail');
+  const spinner = document.getElementById('build-spinner');
   strip.classList.toggle('hidden', !buildState.active);
+  strip.classList.toggle('build-error', buildState.error === true);
+  spinner.style.display = buildState.error ? 'none' : '';
   title.textContent = buildState.title;
   detail.textContent = buildState.detail;
 }
 
-function setBuildState(active, title, detail) {
+function setBuildState(active, title, detail, error) {
   buildState = {
     active,
     title: title || 'Idle',
-    detail: detail || 'No build running.'
+    detail: detail || 'No build running.',
+    error: error || false
   };
   renderBuildState();
 }
@@ -133,7 +137,7 @@ async function rebuild() {
   } catch (err) {
     errors = [err.message || 'Build failed'];
     renderErrors();
-    setBuildState(true, 'Sync failed', err.message || 'Sync failed.');
+    setBuildState(true, 'Sync failed', err.message || 'Sync failed.', true);
   } finally {
     btn.disabled = false;
   }
@@ -174,7 +178,7 @@ async function executeBuild() {
   } catch (err) {
     errors = [err.message || 'Build execution failed'];
     renderErrors();
-    setBuildState(true, 'Build failed', err.message || 'Build execution failed.');
+    setBuildState(true, 'Build failed', err.message || 'Build execution failed.', true);
   } finally {
     btn.disabled = false;
     syncBtn.disabled = false;

@@ -46,6 +46,13 @@ body {
 .build-status-strip.hidden {
   display: none;
 }
+.build-status-strip.build-error {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fef2f2, #fff5f5);
+}
+.build-status-strip.build-error .build-status-title {
+  color: #dc2626;
+}
 .build-spinner {
   width: 18px;
   height: 18px;
