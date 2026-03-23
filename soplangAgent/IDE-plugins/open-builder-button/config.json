@@ -1,0 +1,12 @@
+{
+    "pluginCategory": "application",
+    "component": "open-builder-button",
+    "location": ["file-exp:toolbar"],
+    "label": "Builder",
+    "tooltip": "Open Builder",
+    "icon": "./icon.svg",
+    "presenter": "OpenBuilderButton",
+    "type": "embedded",
+    "autoPin": false,
+    "dependencies": []
+}
