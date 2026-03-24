@@ -627,6 +627,7 @@ export const createSoplangBuilder = ({
             debug.log("[buildFromSpecsMarkdown] Document updated:", docId);
             await workspace.forceSave();
             await workspace.buildAll();
+            await workspace.shutDown();
 
             const buildErrors = buildErrorsGetter();
             if (buildErrors.length > 0) {
