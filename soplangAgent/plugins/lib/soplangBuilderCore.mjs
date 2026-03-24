@@ -502,8 +502,18 @@ export const createSoplangBuilder = ({
                 lastBuiltAt: new Date().toISOString(),
                 lastBuiltDocuments: Object.keys(state.documentHashes || {})
             }, { fsModule, pathModule, env });
+            const errors = buildErrorsGetter().map((error) => {
+                const message = error?.message || (() => {
+                    try {
+                        return JSON.stringify(error, null, 2);
+                    } catch (_) {
+                        return String(error);
+                    }
+                })();
+                return { message };
+            });
             return {
-                errors: buildErrorsGetter(),
+                errors,
                 durationMs: Date.now() - startedAt
             };
         },
