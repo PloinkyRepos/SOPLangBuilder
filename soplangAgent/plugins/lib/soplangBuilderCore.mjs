@@ -299,9 +299,16 @@ const executeIncrementalBuild = async ({
             await workspace.buildOnlyForDocument(docId);
             builtDocuments.push(docId);
         } catch (error) {
+            const fallbackMessage = (() => {
+                try {
+                    return JSON.stringify(error, null, 2);
+                } catch (_) {
+                    return String(error);
+                }
+            })();
             executionErrors.push({
                 documentId: docId,
-                message: error?.message || String(error)
+                message: error?.message || fallbackMessage
             });
         }
     }
@@ -404,7 +411,9 @@ export const getVariablesWithValues = async (workspace, {
             const raw = await workspace.getVarValue(docId, varName);
             entry.value = parseMaybeJson(raw);
         } catch (err) {
-            entry.errorInfo = err?.message || String(err);
+            if (!entry.errorInfo) {
+                entry.errorInfo = err?.message || String(err);
+            }
         }
         enriched.push(entry);
     }
