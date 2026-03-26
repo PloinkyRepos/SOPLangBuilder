@@ -1,98 +1,50 @@
 /**
  * Debug logger for SOPLang Builder.
  * Logs information only when ACHILLES_DEBUG=true or ACHILLES_DEBUG=1.
- * Writes logs to achilles-debug.log in current working directory.
- * Uses a lock file to coordinate concurrent writes across processes.
+ * Writes logs to achilles-debug-<PID>.log in a debuglogs/ subdirectory.
+ * Each process gets its own file — no cross-process contention or locking needed.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 
-const LOCK_SUFFIX = ".lock";
-const DEFAULT_LOCK_WAIT_MS = 2000;
-const DEFAULT_LOCK_RETRY_MS = 10;
-const DEFAULT_LOCK_STALE_MS = 30000;
+const DEBUG_ENV = String(process.env.ACHILLES_DEBUG ?? '').toLowerCase();
+const DEBUG_ENABLED = DEBUG_ENV === 'true' || DEBUG_ENV === '1';
 
-const parsePositiveInt = (value, fallback) => {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
+let stream = null;
+let initialised = false;
 
-const LOCK_WAIT_MS = parsePositiveInt(process.env.ACHILLES_DEBUG_LOCK_WAIT_MS, DEFAULT_LOCK_WAIT_MS);
-const LOCK_RETRY_MS = parsePositiveInt(process.env.ACHILLES_DEBUG_LOCK_RETRY_MS, DEFAULT_LOCK_RETRY_MS);
-const LOCK_STALE_MS = parsePositiveInt(process.env.ACHILLES_DEBUG_LOCK_STALE_MS, DEFAULT_LOCK_STALE_MS);
+const getLogsDir = () => path.resolve(process.cwd(), 'debuglogs');
 
-const sleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+const getLogFilePath = () => path.join(getLogsDir(), `achilles-debug-${process.pid}.log`);
 
-const isDebugEnabled = () => {
-    const val = process.env.ACHILLES_DEBUG;
-    return val === 'true' || val === '1';
-};
+function ensureStream() {
+    if (!DEBUG_ENABLED) return null;
+    if (initialised) return stream;
+    initialised = true;
+
+    const logsDir = getLogsDir();
+    try {
+        fs.mkdirSync(logsDir, { recursive: true });
+    } catch (err) {
+        console.warn(`[debugLogger] Failed to create ${logsDir}: ${err.message}`);
+        return null;
+    }
+
+    try {
+        stream = fs.createWriteStream(getLogFilePath(), { flags: 'a', encoding: 'utf8' });
+        stream.on('error', (err) => {
+            console.warn(`[debugLogger] Stream error: ${err.message}`);
+            stream = null;
+        });
+    } catch (err) {
+        console.warn(`[debugLogger] Failed to open log file: ${err.message}`);
+        return null;
+    }
+    return stream;
+}
 
 const timestamp = () => new Date().toISOString();
-
-const getLogFilePath = () => path.join(process.cwd(), 'achilles-debug.log');
-const getLockFilePath = () => `${getLogFilePath()}${LOCK_SUFFIX}`;
-
-const sleepSync = (ms) => {
-    Atomics.wait(sleepBuffer, 0, 0, ms);
-};
-
-const acquireLock = (lockFile) => {
-    const startedAt = Date.now();
-
-    while (true) {
-        try {
-            const fd = fs.openSync(lockFile, "wx");
-            fs.writeFileSync(fd, `${process.pid} ${startedAt}\n`, "utf8");
-            return fd;
-        } catch (err) {
-            if (err?.code !== "EEXIST") {
-                throw err;
-            }
-
-            try {
-                const stat = fs.statSync(lockFile);
-                const ageMs = Date.now() - stat.mtimeMs;
-                if (ageMs > LOCK_STALE_MS) {
-                    try {
-                        fs.unlinkSync(lockFile);
-                    } catch (unlinkErr) {
-                        if (unlinkErr?.code !== "ENOENT") {
-                            throw unlinkErr;
-                        }
-                    }
-                    continue;
-                }
-            } catch (statErr) {
-                if (statErr?.code === "ENOENT") {
-                    continue;
-                }
-                throw statErr;
-            }
-
-            if (Date.now() - startedAt >= LOCK_WAIT_MS) {
-                throw new Error(`Timed out acquiring lock after ${LOCK_WAIT_MS}ms`);
-            }
-
-            sleepSync(LOCK_RETRY_MS);
-        }
-    }
-};
-
-const releaseLock = (lockFile, fd) => {
-    try {
-        fs.closeSync(fd);
-    } catch (_) {}
-
-    try {
-        fs.unlinkSync(lockFile);
-    } catch (err) {
-        if (err?.code !== "ENOENT") {
-            throw err;
-        }
-    }
-};
 
 const formatArgs = (args) => {
     return args.map(arg => {
@@ -110,28 +62,13 @@ const formatArgs = (args) => {
 };
 
 const writeToFile = (level, args) => {
-    if (!isDebugEnabled()) return;
+    if (!DEBUG_ENABLED) return;
 
-    const logFile = getLogFilePath();
-    const lockFile = getLockFilePath();
+    const s = ensureStream();
+    if (!s) return;
+
     const message = `[${level} ${timestamp()}] ${formatArgs(args)}\n`;
-    let lockFd = null;
-
-    try {
-        lockFd = acquireLock(lockFile);
-        fs.appendFileSync(logFile, message, 'utf8');
-    } catch (err) {
-        // Fallback to console if file write fails
-        console.error(`Failed to write to log file: ${err.message}`);
-    } finally {
-        if (lockFd !== null) {
-            try {
-                releaseLock(lockFile, lockFd);
-            } catch (releaseErr) {
-                console.error(`Failed to release log lock: ${releaseErr.message}`);
-            }
-        }
-    }
+    s.write(message);
 };
 
 export const debug = {
@@ -153,7 +90,7 @@ export const debug = {
     groupEnd: () => {
         writeToFile('GROUP', ['<<<']);
     },
-    isEnabled: isDebugEnabled,
+    isEnabled: () => DEBUG_ENABLED,
     getLogFilePath,
 };
 
