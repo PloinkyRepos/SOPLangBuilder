@@ -95,6 +95,7 @@ const collectDocumentTemplates = async (files, {
             docTemplates[id] = docTemplates[id] || {
                 ...docData,
                 docId: docData.docId || id,
+                docPath: pathModule.resolve(filePath),
                 title: docData.title || id,
                 category: docData.category || "category",
                 commands: docData.commands || "",
@@ -176,7 +177,8 @@ const resetExistingDocument = async (documents, docId, docTemplate) => {
         category,
         docTemplate.infoText || "",
         docTemplate.commands || "",
-        docTemplate.comments || {}
+        docTemplate.comments || {},
+        docTemplate.docPath
     );
 
     return docObj;
