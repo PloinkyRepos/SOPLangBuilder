@@ -46,11 +46,6 @@ export const createAchillesSkills = async ({
         await ensureAgent();
         const skills = Array.from(agent.skillCatalog.values());
 
-        debug.log("[AchillesSkills] Skills discovered", {
-            count: skills.length,
-            names: skills.map((record) => record.name)
-        });
-
         for (const record of skills) {
             const commandName = record.name;
             if (!commandName || registered.has(commandName)) {
@@ -66,7 +61,6 @@ export const createAchillesSkills = async ({
 
             workspace.registerCommand(commandName, async (inputValues, parsedCommand, currentDocId, graph, buildInstance, docPath) => {
                     await ensureAgent();
-                    debug.log(`[AchillesSkills] ${commandName} after ensureAgent() called `);
                     const promptText = Array.isArray(inputValues)
                         ? inputValues.join(" ")
                         : (typeof inputValues === "string" ? inputValues : "");
