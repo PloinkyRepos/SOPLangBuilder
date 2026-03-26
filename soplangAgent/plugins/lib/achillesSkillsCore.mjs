@@ -64,13 +64,18 @@ export const createAchillesSkills = async ({
                 shortName: record.shortName || ""
             });
 
-            workspace.registerCommand(commandName, async (inputValues) => {
+            workspace.registerCommand(commandName, async (inputValues, parsedCommand, currentDocId, graph, buildInstance, docPath) => {
                     await ensureAgent();
                     debug.log(`[AchillesSkills] ${commandName} after ensureAgent() called `);
                     const promptText = Array.isArray(inputValues)
                         ? inputValues.join(" ")
                         : (typeof inputValues === "string" ? inputValues : "");
-                    const out = await agent.executeWithReviewMode(promptText, { skillName: record.name }, "none");
+                    const out = await agent.executeWithReviewMode(promptText, {
+                        skillName: record.name,
+                        context: {
+                            sopDocFilePath: docPath
+                        }
+                    }, "none");
                     if (out && typeof out === "object" && Object.prototype.hasOwnProperty.call(out, "result")) {
                         return out.result;
                     }
