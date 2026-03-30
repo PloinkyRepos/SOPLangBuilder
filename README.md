@@ -2,6 +2,10 @@
 
 Utilities and an MCP-facing SOPLang agent used by Explorer for document builds.
 
+Detailed agent docs:
+
+- [soplangAgent README](./soplangAgent/README.md)
+
 ## soplangAgent (global-capable)
 
 - **Location:** `soplangAgent/` (manifest uses `node:20-bullseye`, installs OS dependencies via `scripts/install.sh`).
