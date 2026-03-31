@@ -53,6 +53,96 @@ body {
 .build-status-strip.build-error .build-status-title {
   color: #dc2626;
 }
+.logs-title {
+  margin: -16px -16px 0;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #1f2937;
+}
+.logs-copy-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.logs-copy-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #4b5563;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.logs-copy-btn:hover {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+.logs-copy-btn:active {
+  transform: translateY(1px);
+}
+.logs-copy-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logs-copy-toast {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px);
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s ease;
+}
+.logs-copy-toast.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+.build-live-log {
+  margin: 0;
+  padding: 12px 14px;
+  min-height: 160px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  background: #ffffff;
+  color: #1f2937;
+  border-radius: 0 0 8px 8px;
+}
 .build-spinner {
   width: 18px;
   height: 18px;
@@ -236,5 +326,23 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 @keyframes build-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header,
+  .tabs,
+  .page-body,
+  .build-status-strip {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .logs-title,
+  .build-live-log {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }

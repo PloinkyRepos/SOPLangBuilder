@@ -12,6 +12,9 @@ let buildState = {
   title: 'Idle',
   detail: 'No build running.'
 };
+let liveTaskLogs = new Map();
+let liveTaskOrder = [];
+let copyLiveLogsToastTimer = null;
 
 const extractMcpText = (result) => {
   if (!result || !Array.isArray(result.content)) return '';
@@ -103,6 +106,71 @@ function setBuildState(active, title, detail, error) {
   renderBuildState();
 }
 
+function resetLiveLogs() {
+  liveTaskLogs = new Map();
+  liveTaskOrder = [];
+  renderLiveLogs();
+}
+
+function renderLiveLogs() {
+  const logView = document.getElementById('build-live-log');
+  if (!logView) return;
+
+  const shouldStickToBottom = (logView.scrollTop + logView.clientHeight) >= (logView.scrollHeight - 12);
+
+  if (!liveTaskOrder.length) {
+    logView.textContent = 'No logs yet.';
+    return;
+  }
+
+  const sections = [];
+  liveTaskOrder.forEach((taskId, index) => {
+    const entry = liveTaskLogs.get(taskId);
+    if (!entry) return;
+    sections.push(`### ${entry.label} (${taskId})`);
+    sections.push(entry.tail && entry.tail.trim().length ? entry.tail.trimEnd() : '(No output yet)');
+    if (entry.truncated) {
+      sections.push('[Older output truncated to keep UI responsive.]');
+    }
+    if (index < liveTaskOrder.length - 1) {
+      sections.push('');
+    }
+  });
+
+  logView.textContent = sections.join('\n');
+  if (shouldStickToBottom) {
+    logView.scrollTop = logView.scrollHeight;
+  }
+}
+
+function updateLiveLogsFromTask(task, label) {
+  if (!task || typeof task !== 'object' || !task.id) {
+    return;
+  }
+
+  if (!liveTaskLogs.has(task.id)) {
+    liveTaskOrder.push(task.id);
+    liveTaskLogs.set(task.id, {
+      label: label || task.toolName || 'Task',
+      tail: '',
+      truncated: false
+    });
+  }
+
+  const entry = liveTaskLogs.get(task.id);
+  if (label) {
+    entry.label = label;
+  }
+  if (typeof task.logTail === 'string') {
+    entry.tail = task.logTail;
+  }
+  if (task.logTruncated === true) {
+    entry.truncated = true;
+  }
+
+  renderLiveLogs();
+}
+
 function describeTaskUpdate(task, fallbackLabel) {
   const status = typeof task?.status === 'string' ? task.status.toLowerCase() : 'queued';
   if (status === 'queued') {
@@ -137,6 +205,7 @@ function describeTaskUpdate(task, fallbackLabel) {
 
 function createStatusUpdater(label, runningDetail) {
   return (task) => {
+    updateLiveLogsFromTask(task, label);
     const status = typeof task?.status === 'string' ? task.status.toLowerCase() : 'queued';
     if (status === 'running') {
       setBuildState(true, `${label} running`, runningDetail);
@@ -164,6 +233,7 @@ async function rebuild() {
   const btn = document.getElementById('start-build');
   btn.disabled = true;
   try {
+    resetLiveLogs();
     setBuildState(true, 'Sync markdown queued', 'Waiting for the sync task to start.');
     const result = await callTool('sync_markdown_documents', {}, {
       onTaskUpdate: createStatusUpdater(
@@ -194,6 +264,7 @@ async function executeBuild() {
   btn.disabled = true;
   syncBtn.disabled = true;
   try {
+    resetLiveLogs();
     setBuildState(true, 'Sync variables queued', 'Waiting for the sync task to start.');
     const syncResult = await callTool('sync_markdown_documents', {}, {
       onTaskUpdate: createStatusUpdater(
@@ -210,6 +281,7 @@ async function executeBuild() {
     setBuildState(true, `${buildLabel} queued`, 'Waiting for the build task to start.');
     const buildResult = await callTool(buildToolName, {}, {
       onTaskUpdate(task) {
+        updateLiveLogsFromTask(task, buildLabel);
         const statusView = describeTaskUpdate(task, buildLabel);
         setBuildState(true, statusView.title, statusView.detail);
       }
@@ -282,6 +354,61 @@ function toValueString(value) {
   return String(value);
 }
 
+async function copyTextToClipboard(text) {
+  const value = typeof text === 'string' ? text : String(text ?? '');
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const temp = document.createElement('textarea');
+  temp.value = value;
+  temp.setAttribute('readonly', 'readonly');
+  temp.style.position = 'fixed';
+  temp.style.opacity = '0';
+  temp.style.left = '-9999px';
+  document.body.appendChild(temp);
+  temp.select();
+  document.execCommand('copy');
+  document.body.removeChild(temp);
+}
+
+async function handleCopyLiveLogs() {
+  const button = document.getElementById('copy-live-logs');
+  const logView = document.getElementById('build-live-log');
+  if (!button || !logView) {
+    return;
+  }
+
+  const text = logView.textContent || '';
+
+  try {
+    await copyTextToClipboard(text);
+    showCopyLiveLogsToast('Copied!');
+  } catch (_) {
+    showCopyLiveLogsToast('Copy failed');
+  }
+}
+
+function showCopyLiveLogsToast(message) {
+  const toast = document.getElementById('copy-live-logs-toast');
+  if (!toast) {
+    return;
+  }
+
+  toast.textContent = message || 'Copied!';
+  toast.classList.add('visible');
+
+  if (copyLiveLogsToastTimer) {
+    clearTimeout(copyLiveLogsToastTimer);
+  }
+
+  copyLiveLogsToastTimer = setTimeout(() => {
+    toast.classList.remove('visible');
+    copyLiveLogsToastTimer = null;
+  }, 1200);
+}
+
 function renderVars() {
   const body = document.getElementById('vars-body');
   const visible = getVisibleVariables();
@@ -334,6 +461,11 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 document.getElementById('start-build').addEventListener('click', rebuild);
 document.getElementById('execute-build').addEventListener('click', executeBuild);
+
+const copyLiveLogsButton = document.getElementById('copy-live-logs');
+if (copyLiveLogsButton) {
+  copyLiveLogsButton.addEventListener('click', handleCopyLiveLogs);
+}
 
 const showAllCheckbox = document.getElementById('show-all-vars');
 if (showAllCheckbox) {
@@ -390,4 +522,5 @@ function attachVarClicks() {
 loadVariables();
 renderErrors();
 renderBuildState();
+renderLiveLogs();
 switchTab('errors');

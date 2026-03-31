@@ -30,12 +30,29 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="errors">Build Errors</div>
+    <div class="tab" data-tab="logs">Live Logs</div>
     <div class="tab" data-tab="vars">Variables</div>
   </div>
 
   <div class="page-body">
     <section class="panel tab-content" data-content="errors">
       <div class="errors-list" id="errors-body">No errors</div>
+    </section>
+
+    <section class="panel tab-content hidden" data-content="logs" aria-live="polite">
+      <div class="logs-title">
+        <span>Live logs</span>
+        <div class="logs-copy-wrap">
+          <span id="copy-live-logs-toast" class="logs-copy-toast" role="status" aria-live="polite">Copied!</span>
+          <button id="copy-live-logs" class="logs-copy-btn" type="button" aria-label="Copy live logs" title="Copy live logs">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+              <path d="M15 9V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <pre id="build-live-log" class="build-live-log">No logs yet.</pre>
     </section>
 
     <section class="panel tab-content hidden" data-content="vars">

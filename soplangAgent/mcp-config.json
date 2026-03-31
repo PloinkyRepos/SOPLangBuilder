@@ -30,6 +30,7 @@
             "description": "Run the SOPLang build only for documents changed by the last markdown sync, or for an explicit list of document IDs.",
             "command": "/code/soplang-tool.sh",
             "cwd": "workspace",
+            "async": true,
             "env": {
                 "TOOL_NAME": "execute_incremental_build"
             },
