@@ -54,3 +54,7 @@ Coverage currently includes:
 - `get_variables_with_values`
 - `execute_skill`
 - MCP wrapper tool mapping and preflight validation
+
+## Documentation
+
+- [SA01 - SOPLang Agent Overview](./docs/specs/SA/SA01-agent-overview.md)
