@@ -15,14 +15,11 @@ Detailed agent docs:
   - Start via Ploinky CLI (e.g., `p-cli start soplangAgent` if not already running). See `ploinky/docs/ploinky-overview.md` for `global` semantics and router setup.
 - **MCP tools:** `soplangAgent/mcp-config.json` defines:
   - `sync_markdown_documents`
-  - `execute_incremental_build`
   - `execute_workspace_build`
-  - `build_from_specs_markdown`
   - `get_variables_with_values`
   - `execute_skill`
 - All tools execute through `/code/soplang-tool.sh` with `cwd: "workspace"`.
 - The wrapper script writes execution output to `last-tool.log` at repo root and sets storage paths in the container: `/persistoStorage`, `/persistoLogs`, `/persistoAudit`.
 - **Typical call for Explorer variable refreshes:** use `sync_markdown_documents`.
-- **Preferred build after sync:** use `execute_incremental_build` to build only changed documents.
-- **Run the full SOPLang pipeline separately:** use `execute_workspace_build`.
+- **Run SOPLang builds:** use `execute_workspace_build` (full workspace build).
 - Internal structure is documented in `soplangAgent/README.md`.

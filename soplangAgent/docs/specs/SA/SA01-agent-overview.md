@@ -2,7 +2,7 @@
 
 ## Summary
 
-`soplangAgent` expune tooluri MCP pentru sync de documente markdown, build incremental și integrarea skill-urilor SOPLang.
+`soplangAgent` expune tooluri MCP pentru sync de documente markdown, build de workspace și integrarea skill-urilor SOPLang.
 
 ## Background / Problem Statement
 
@@ -28,9 +28,7 @@ Explorer trebuie să poată declanșa fluxuri SOPLang fără a incorpora parseru
 Tooluri cheie:
 
 - `sync_markdown_documents`
-- `execute_incremental_build`
 - `execute_workspace_build`
-- `build_from_specs_markdown`
 - `get_variables_with_values`
 - `execute_skill`
 

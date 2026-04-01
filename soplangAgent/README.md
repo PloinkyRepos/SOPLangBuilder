@@ -9,7 +9,7 @@ This agent exposes explicit MCP tools through `mcp-config.json` and executes the
 - `plugins/AchillesSkills.js`
   Thin bridge wrapper. Delegates to `plugins/lib/achillesSkillsCore.mjs`.
 - `plugins/lib/soplangBuilderCore.mjs`
-  Main orchestration for `sync_markdown_documents`, `execute_incremental_build`, `execute_workspace_build`, `build_from_specs_markdown`, and `get_variables_with_values`.
+  Main orchestration for `sync_markdown_documents`, `execute_workspace_build`, and `get_variables_with_values`.
 - `plugins/lib/workspaceRoots.mjs`
   Workspace root detection and markdown file walking.
 - `plugins/lib/markdownMetadata.mjs`
@@ -48,9 +48,7 @@ npm test
 Coverage currently includes:
 
 - `sync_markdown_documents`
-- `execute_incremental_build`
 - `execute_workspace_build`
-- `build_from_specs_markdown`
 - `get_variables_with_values`
 - `execute_skill`
 - MCP wrapper tool mapping and preflight validation
