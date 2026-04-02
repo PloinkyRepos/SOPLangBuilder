@@ -90,11 +90,7 @@
 
                 <section>
                     <h2>Input Contracts</h2>
-                    <p>Most tools have empty schemas. Two tools currently expose arguments:</p>
-                    <ul>
-                        <li><code>get_variable_with_value</code>: requires <code>documentId</code> and <code>varName</code>.</li>
-                        <li><code>execute_skill</code>: requires <code>skillName</code>, optional <code>promptText</code>.</li>
-                    </ul>
+                    <p>Most tools currently use empty schemas. The two explicit argument contracts are <code>get_variable_with_value</code>, which requires <code>documentId</code> and <code>varName</code>, and <code>execute_skill</code>, which requires <code>skillName</code> with optional <code>promptText</code>.</p>
                     <pre><code>{
   "name": "execute_skill",
   "inputSchema": {
@@ -106,11 +102,7 @@
 
                 <section>
                     <h2>Execution Characteristics</h2>
-                    <ul>
-                        <li>Tool calls can be async at AgentServer queue level (<code>"async": true</code> where configured).</li>
-                        <li>Every invocation receives isolated process state and plugin bootstrap.</li>
-                        <li>Errors are surfaced as MCP errors when wrapper exits non-zero.</li>
-                    </ul>
+                    <p>Tool calls can be queued asynchronously at AgentServer level where <code>"async": true</code> is configured. Every invocation starts with isolated process state and fresh plugin bootstrap, and wrapper failures propagate as MCP-visible errors when the process exits non-zero.</p>
                 </section>
             </div>
         </div>

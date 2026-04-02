@@ -40,35 +40,9 @@
                 </section>
 
                 <section class="highlight-box">
-                    <h3>What this agent does</h3>
-                    <ul>
-                        <li>Bridges <a href="https://assistos-ai.github.io/soplang/" target="_blank" rel="noopener noreferrer">SOPLang</a> workspace APIs to standard MCP tools configured in <code>soplangAgent/mcp-config.json</code>.</li>
-                        <li>Loads <a href="https://assistos-ai.github.io/soplang/" target="_blank" rel="noopener noreferrer">SOPLang</a> plugins and registers commands exposed from <code>soplangAgent/plugins/</code>.</li>
-                        <li>Discovers Achilles skills and publishes them as <a href="https://assistos-ai.github.io/soplang/" target="_blank" rel="noopener noreferrer">SOPLang</a> commands.</li>
-                        <li>Serves as the backend communication point for UI actions triggered from Explorer.</li>
-                    </ul>
-                </section>
-
-                <section>
-                    <h2>Documentation Map</h2>
-                    <div class="grid">
-                        <article>
-                            <h3>Architecture</h3>
-                            <p>Component boundaries, plugin roles, and relation with <a href="https://ploinky.com/" target="_blank" rel="noopener noreferrer">Ploinky</a> AgentServer are documented in <a href="architecture.html">Architecture</a>.</p>
-                        </article>
-                        <article>
-                            <h3>Execution Workflow</h3>
-                            <p>Per-tool process lifecycle, plugin bootstrap, skill registration, and persistence steps are documented in <a href="execution-workflow.html">Tool Execution Workflow</a>.</p>
-                        </article>
-                        <article>
-                            <h3>MCP Surface</h3>
-                            <p>Current tools and their input contracts are listed in <a href="mcp-tools.html">MCP Tools</a>.</p>
-                        </article>
-                        <article>
-                            <h3>Configuration</h3>
-                            <p>Manifest standard for <a href="https://ploinky.com/" target="_blank" rel="noopener noreferrer">Ploinky</a> and environment variables are documented in <a href="configuration.html">Manifest and Environment</a>.</p>
-                        </article>
-                    </div>
+                    <h3>Operational Role</h3>
+                    <p>The agent bridges <a href="https://assistos-ai.github.io/soplang/" target="_blank" rel="noopener noreferrer">SOPLang</a> workspace APIs to MCP tools declared in <code>soplangAgent/mcp-config.json</code>, then executes those operations through a controlled wrapper path. It loads runtime plugins from <code>soplangAgent/plugins/</code>, registers commands, and makes the resulting contract available to Explorer-facing flows.</p>
+                    <p>The same boundary also includes Achilles skill discovery and command exposure, so UI actions can call a stable MCP surface while SOPLang-specific orchestration remains inside <code>soplangBuilder</code>.</p>
                 </section>
 
                 <section>
