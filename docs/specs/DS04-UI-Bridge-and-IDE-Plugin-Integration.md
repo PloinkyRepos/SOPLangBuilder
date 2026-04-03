@@ -22,6 +22,8 @@ Requirement U4: UI integration must support internal Explorer repository workflo
 
 Requirement U5: agent-provided UI actions must remain mapped to documented contract operations.
 
+Requirement U6: SOPLang-specific document plugin bundles for variable editing and script execution must remain agent-owned under `soplangAgent/IDE-plugins` so Explorer base UI can stay decoupled from SOPLang implementation details.
+
 ## Constraints
 
 Constraint Q1: browser components are not allowed to bypass MCP and call private plugin internals.
@@ -40,4 +42,4 @@ Invariant P3: integration keeps soplangBuilder as intermediary between UI intent
 
 ## Validation Criteria
 
-Validation is satisfied when UI plugin actions trigger MCP tools successfully, when task updates are observable for asynchronous operations, and when backend behavior remains aligned with declared contracts regardless of host UI refactors.
+Validation is satisfied when UI plugin actions trigger MCP tools successfully, when task updates are observable for asynchronous operations, when SOPLang-specific bundles (`edit-variables`, `run-script`) are loaded from `soplangAgent/IDE-plugins`, and when backend behavior remains aligned with declared contracts regardless of host UI refactors.
